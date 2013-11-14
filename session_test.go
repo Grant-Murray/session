@@ -1,8 +1,15 @@
-// Session testing
+/* Session testing.
+
+In order to run these tests, a running sessiond is required as well as a configured mail server (cf. mailbot)
+This server key used in these tests needs to match the one used in the running sessiond (see TestSetup for where it is set)
+
+
+*/
 package session
 
 import (
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/Grant-Murray/logdb"
@@ -40,9 +47,21 @@ func initClient() *http.Client { /*{{{*/
 } /*}}}*/
 
 func TestSetup(t *testing.T) { /*{{{*/
-	Configure("")
+	// Test only bootstrap method
+	Conf = new(Config)
+	Conf.DatabaseSource = "user=postgres password='with spaces' dbname=sessdb host=localhost port=5432 sslmode=disable"
 
-	err := logdb.Initialize(Conf.DatabaseHandle, "", "INSERT INTO session.log (entered, msg, level) VALUES (now(), $1, $2)")
+	// This server key needs to match the one used in the running sessiond
+	var err error
+	sk := `fa1725ba8034485170912d8c29d4ef118f3fddd43e21437f0ee167835921b786d4bc6f52027fb858e6a138d6dfa1875d4ec12488464af3dbe79984bc23ffdece`
+	Conf.ServerKey, err = hex.DecodeString(sk)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to convert SERVERKEY: %s", err))
+	}
+
+	Configure()
+
+	err = logdb.Initialize(Conf.DatabaseHandle, "", "INSERT INTO session.log (entered, msg, level) VALUES (now(), $1, $2)")
 	if err != nil {
 		panic(fmt.Sprintf("Failed to initialize logdb: %s", err))
 	}
@@ -50,7 +69,7 @@ func TestSetup(t *testing.T) { /*{{{*/
 
 } /*}}}*/
 
-func Test_Config(t *testing.T) {
+func Test_Config(t *testing.T) { /*{{{*/
 	if Conf.MaxLogDays != 5 {
 		t.Fatalf("FAIL: MaxLogDays had an unexpected value")
 	}
@@ -74,7 +93,7 @@ func Test_Config(t *testing.T) {
 	if Conf.Smtp.EmailFrom != "no-reply@mailbot.net" {
 		t.Fatalf("FAIL: Smtp.EmailFrom had an unexpected value")
 	}
-}
+} /*}}}*/
 
 // doTestUser makes the call to the server. If SysUserId is blank, it is a PUT /session/users
 // otherwise it is a POST /session/user/{SysUserId}

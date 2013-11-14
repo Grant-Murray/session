@@ -1,11 +1,13 @@
 package session
 
 import (
+	"bufio"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"github.com/Grant-Murray/mailbot"
 	_ "github.com/lib/pq"
+	"os"
 )
 
 /* Config holds the values loaded from the database. The database dataSourceName is bootstrapped from standard input.
@@ -77,47 +79,52 @@ type Config struct {
 // it.
 var Conf *Config
 
-// LoadBootstrapConfig reads a few things to find the database
-func (c *Config) stdinBootstrap() {
-	if c.DatabaseSource == "" {
-		fmt.Print("Enter the PostgreSQL source string: ")
-		fmt.Scanf("%s\n", &c.DatabaseSource)
-		fmt.Println()
-	}
+// bootstrap reads a few things to find the database
+func (c *Config) bootstrap() {
+	scanner := bufio.NewScanner(os.Stdin)
 
-	if c.ServerKey == nil {
-		fmt.Print("Enter the secret server key: ")
-		var sk string
-		fmt.Scanf("%s\n", &sk)
-		fmt.Println()
-		var err error
-		c.ServerKey, err = hex.DecodeString(sk)
-		if err != nil {
-			panic("Failed to convert SERVERKEY to bytes")
-		}
-	}
-}
+	// DatabaseSource
+	fmt.Print("Enter the PostgreSQL source string: ")
+	scanner.Scan()
+	c.DatabaseSource = scanner.Text()
+	fmt.Println()
 
-// TODO this should be obfuscated
-func (c *Config) internalBootstrap() {
-	if c.DatabaseSource == "" {
-		c.DatabaseSource = "user=postgres password='with spaces' dbname=sessdb host=localhost port=41230 sslmode=disable"
-	}
 	var err error
-	c.ServerKey, err = hex.DecodeString("c3efc2d599734b0b7488514f5bf393a7869324c0d65f27cb9d569b466d86d03f3974091e52a044a0b40c30eecf74709f3a881da3e17a9deef46ad7bd72fe308a")
+
+	// ServerKey
+	fmt.Print("Enter the secret server key: ")
+	scanner.Scan()
+	sk := scanner.Text()
+	fmt.Println()
+
+	if err = scanner.Err(); err != nil {
+		panic(fmt.Sprintf("Error reading standard input:", err))
+	}
+
+	c.ServerKey, err = hex.DecodeString(sk)
 	if err != nil {
-		panic("Failed to convert SERVERKEY to bytes")
+		panic(fmt.Sprintf("Failed to convert SERVERKEY [%s] to bytes: %s", sk, err))
 	}
+
 }
 
-// Open reads configuration values from a table
-// and loads them.
-func Configure(dsn string) {
-	Conf = new(Config)
-	Conf.DatabaseSource = dsn
-	Conf.internalBootstrap()
-	Conf.stdinBootstrap()
+// Configure reads configuration values from a table
+// and loads them into the global Conf
+func Configure() {
 	var err error
+
+	if Conf == nil {
+		// need to bootstrap
+		Conf = new(Config)
+		Conf.bootstrap()
+
+		if len(Conf.ServerKey) != 64 {
+			panic(fmt.Sprintf("Serverkey needs to be 64 bytes long exactly, it was only %d bytes", len(Conf.ServerKey)))
+		}
+	} else {
+		// Assert: we are testing
+	}
+
 	Conf.DatabaseHandle, err = sql.Open("postgres", Conf.DatabaseSource)
 	if err != nil {
 		panic(err)
