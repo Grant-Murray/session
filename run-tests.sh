@@ -4,8 +4,8 @@ TYP='test'
 #TYP='bench'
 
 # ensure a clean slate
-rm -f /tmp/mailbot.boxes/*
-rm -f /tmp/sessdb.*
+sudo rm -f /tmp/mailbot.boxes/*
+sudo rm -f /tmp/sessdb.*
 
 # install 
 go clean
