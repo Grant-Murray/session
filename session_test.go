@@ -30,12 +30,12 @@ var (
   SavedClearPassword string
   SavedSessionToken  string
   SavedSessionSalt   string
-  SavedIpAddress     string = `10.10.10.6` // TODO should do a DNS lookup of Conf.HttpsHost for this
-  SavedUserAgent     string = `Agent007-Tester`
+  SavedIpAddress     string = "10.10.10.6" // TODO should do a DNS lookup of Conf.HttpsHost for this
+  SavedUserAgent     string = "Agent007-Tester"
   SavedCookieJar     http.CookieJar
 )
 
-func initClient() *http.Client { /*{{{*/
+func initClient() *http.Client {
 
   tt := new(http.Transport) // tt => testing transport
   tt.TLSClientConfig = new(tls.Config)
@@ -44,16 +44,16 @@ func initClient() *http.Client { /*{{{*/
   client := new(http.Client)
   client.Transport = tt
   return client
-} /*}}}*/
+}
 
-func TestSetup(t *testing.T) { /*{{{*/
+func TestSetup(t *testing.T) {
   // Test only bootstrap method
   Conf = new(Config)
   Conf.DatabaseSource = "user=postgres password='with spaces' dbname=sessdb host=localhost port=5432 sslmode=disable"
 
   // This server key needs to match the one used in the running sessiond
   var err error
-  sk := `fa1725ba8034485170912d8c29d4ef118f3fddd43e21437f0ee167835921b786d4bc6f52027fb858e6a138d6dfa1875d4ec12488464af3dbe79984bc23ffdece`
+  sk := "fa1725ba8034485170912d8c29d4ef118f3fddd43e21437f0ee167835921b786d4bc6f52027fb858e6a138d6dfa1875d4ec12488464af3dbe79984bc23ffdece"
   Conf.ServerKey, err = hex.DecodeString(sk)
   if err != nil {
     panic(fmt.Sprintf("Failed to convert SERVERKEY: %s", err))
@@ -67,9 +67,9 @@ func TestSetup(t *testing.T) { /*{{{*/
   }
   logdb.Info.Print("--- Test runner started ---")
 
-} /*}}}*/
+}
 
-func Test_Config(t *testing.T) { /*{{{*/
+func Test_Config(t *testing.T) {
   if Conf.MaxLogDays != 5 {
     t.Fatalf("FAIL: MaxLogDays had an unexpected value")
   }
@@ -93,11 +93,11 @@ func Test_Config(t *testing.T) { /*{{{*/
   if Conf.Smtp.EmailFrom != "no-reply@mailbot.net" {
     t.Fatalf("FAIL: Smtp.EmailFrom had an unexpected value")
   }
-} /*}}}*/
+}
 
 // doTestUser makes the call to the server. If SysUserId is blank, it is a PUT /session/users
 // otherwise it is a POST /session/user/{SysUserId}
-func doTestUser(t *testing.T, SysUserId string, body string) (auResp *UserResponse, err error) { /*{{{*/
+func doTestUser(t *testing.T, SysUserId string, body string) (auResp *UserResponse, err error) {
   client := initClient()
   auResp = new(UserResponse)
   addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
@@ -121,7 +121,7 @@ func doTestUser(t *testing.T, SysUserId string, body string) (auResp *UserRespon
     client.Jar = SavedCookieJar
   }
 
-  req.Header.Set(`User-Agent`, SavedUserAgent)
+  req.Header.Set("User-Agent", SavedUserAgent)
 
   resp, err := client.Do(req)
   if err != nil {
@@ -138,11 +138,11 @@ func doTestUser(t *testing.T, SysUserId string, body string) (auResp *UserRespon
   resp.Body.Close()
 
   return auResp, err
-} /*}}}*/
+}
 
 var bmarkSessions []*LoginResponse
 
-func Benchmark_Add_User(b *testing.B) { /*{{{*/
+func Benchmark_Add_User(b *testing.B) {
 
   client := initClient()
   addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
@@ -161,12 +161,12 @@ func Benchmark_Add_User(b *testing.B) { /*{{{*/
           "TzName": "America/New_York"
         }`, i, i, i, i, i, i))
 
-    req, err := http.NewRequest(`PUT`, url, c1)
+    req, err := http.NewRequest("PUT", url, c1)
     if err != nil {
       b.Fatalf("Failed to create a request: %s", err)
     }
 
-    req.Header.Set(`User-Agent`, SavedUserAgent)
+    req.Header.Set("User-Agent", SavedUserAgent)
     resp, err := client.Do(req)
     if err != nil {
       b.Fatalf("client request failed: %s", err)
@@ -175,9 +175,9 @@ func Benchmark_Add_User(b *testing.B) { /*{{{*/
     resp.Body.Close()
   }
 
-} /*}}}*/
+}
 
-func Benchmark_Login(b *testing.B) { /*{{{*/
+func Benchmark_Login(b *testing.B) {
 
   client := initClient()
   addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
@@ -188,13 +188,13 @@ func Benchmark_Login(b *testing.B) { /*{{{*/
   for i := 0; i < b.N; i++ {
     c1 := strings.NewReader(fmt.Sprintf(`{"UserIdentifier":"user%d", "ClearPassword":"ABCDEFGHIJ-%d"}`, i, i))
 
-    req, err := http.NewRequest(`POST`, url, c1)
-    req.Header.Set(`User-Agent`, SavedUserAgent)
+    req, err := http.NewRequest("POST", url, c1)
+    req.Header.Set("User-Agent", SavedUserAgent)
     if err != nil {
       b.Fatalf("Failed to create a request: %s", err)
     }
 
-    req.Header.Set(`User-Agent`, SavedUserAgent)
+    req.Header.Set("User-Agent", SavedUserAgent)
     resp, err := client.Do(req)
     if err != nil {
       b.Fatalf("client request failed: %s", err)
@@ -216,9 +216,9 @@ func Benchmark_Login(b *testing.B) { /*{{{*/
 
     resp.Body.Close()
   }
-} /*}}}*/
+}
 
-func Benchmark_VerifyIdentity(b *testing.B) { /*{{{*/
+func Benchmark_VerifyIdentity(b *testing.B) {
 
   b.N = 50
   for i := 0; i < b.N; i++ {
@@ -229,9 +229,9 @@ func Benchmark_VerifyIdentity(b *testing.B) { /*{{{*/
       b.Fatalf("Verify #%d failed: %s", i, vResp.ValidationResult.Message)
     }
   }
-} /*}}}*/
+}
 
-func Benchmark_VerifyIdentity_cached(b *testing.B) { /*{{{*/
+func Benchmark_VerifyIdentity_cached(b *testing.B) {
 
   b.N = 5000
   for i := 0; i < b.N; i++ {
@@ -242,9 +242,9 @@ func Benchmark_VerifyIdentity_cached(b *testing.B) { /*{{{*/
       b.Fatalf("Verify #%d failed: %s", i, vResp.ValidationResult.Message)
     }
   }
-} /*}}}*/
+}
 
-func checkForAttention(SystemRef string, t *testing.T) { /*{{{*/
+func checkForAttention(SystemRef string, t *testing.T) {
   // look for absence Attn log messages
   var attnMsg string
   rows, err := Conf.DatabaseHandle.Query(
@@ -261,9 +261,9 @@ func checkForAttention(SystemRef string, t *testing.T) { /*{{{*/
   if err := rows.Err(); err != nil {
     t.Fatalf("Error while reading rows: %s", err)
   }
-} /*}}}*/
+}
 
-func checkValidationResult(t *testing.T, auResp *UserResponse) { /*{{{*/
+func checkValidationResult(t *testing.T, auResp *UserResponse) {
 
   if auResp.ValidationResult.Status != StatusOK {
     t.Errorf("Failed to validate, status:%s", auResp.ValidationResult.Status)
@@ -280,9 +280,9 @@ func checkValidationResult(t *testing.T, auResp *UserResponse) { /*{{{*/
   if auResp.ValidationResult.PropErrorMsg != "" {
     t.Errorf("Unexpected PropErrorMsg: %s", auResp.ValidationResult.PropErrorMsg)
   }
-} /*}}}*/
+}
 
-func checkBadValidationResult(t *testing.T, prop, propM string, auResp *UserResponse) { /*{{{*/
+func checkBadValidationResult(t *testing.T, prop, propM string, auResp *UserResponse) {
 
   if auResp.ValidationResult.Status != StatusInvalid {
     t.Errorf("Expected invalid status got:%s", auResp.ValidationResult.Status)
@@ -299,9 +299,9 @@ func checkBadValidationResult(t *testing.T, prop, propM string, auResp *UserResp
   if auResp.ValidationResult.PropErrorMsg != propM {
     t.Errorf("Unexpected PropErrorMsg: %s", auResp.ValidationResult.PropErrorMsg)
   }
-} /*}}}*/
+}
 
-func compareStringColumn(t *testing.T, colName string, actual string, expected string) { /*{{{*/
+func compareStringColumn(t *testing.T, colName string, actual string, expected string) {
 
   if expected == "**UUID**" {
     if isMatched, _ := regexp.MatchString(
@@ -314,16 +314,16 @@ func compareStringColumn(t *testing.T, colName string, actual string, expected s
   if actual != expected {
     t.Errorf("%s: expected \"%s\", got \"%s\"", colName, expected, actual)
   }
-} /*}}}*/
+}
 
-func compareBoolColumn(t *testing.T, colName string, actual bool, expected bool) { /*{{{*/
+func compareBoolColumn(t *testing.T, colName string, actual bool, expected bool) {
 
   if actual != expected {
     t.Errorf("%s: expected \"%t\", got \"%t\"", colName, expected, actual)
   }
-} /*}}}*/
+}
 
-func verifyEmailTest(em string, tok string, t *testing.T) (vr *VerifyResponse, err error) { /*{{{*/
+func verifyEmailTest(em string, tok string, t *testing.T) (vr *VerifyResponse, err error) {
   client := initClient()
 
   addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
@@ -333,7 +333,7 @@ func verifyEmailTest(em string, tok string, t *testing.T) (vr *VerifyResponse, e
     return vr, err
   }
 
-  req.Header.Set(`User-Agent`, SavedUserAgent)
+  req.Header.Set("User-Agent", SavedUserAgent)
   resp, err := client.Do(req)
   if err != nil {
     t.Fatalf("client request failed: %s", err)
@@ -348,7 +348,33 @@ func verifyEmailTest(em string, tok string, t *testing.T) (vr *VerifyResponse, e
   }
 
   return vr, err
-} /*}}}*/
+}
+
+func resetEmailTest(url string, t *testing.T) (lr *LoginResponse, err error) {
+  client := initClient()
+
+  req, err := http.NewRequest("GET", url, nil)
+  if err != nil {
+    t.Fatalf("Failed to create a request: %s", err)
+    return lr, err
+  }
+
+  req.Header.Set("User-Agent", SavedUserAgent)
+  resp, err := client.Do(req)
+  if err != nil {
+    t.Fatalf("client request failed: %s", err)
+    return lr, err
+  }
+
+  dec := json.NewDecoder(resp.Body)
+  lr = new(LoginResponse)
+  err = dec.Decode(lr)
+  if err != nil {
+    t.Fatalf("Error while decoding response body: %s", err)
+  }
+
+  return lr, err
+}
 
 type userCase struct {
   descr          string
@@ -360,7 +386,7 @@ type userCase struct {
   expector       func(auResp *UserResponse, ur *UserDbRow, t *testing.T)
 }
 
-func userCaseFactory(index int) *userCase { /*{{{*/
+func userCaseFactory(index int) *userCase {
 
   switch index {
   case 0:
@@ -563,7 +589,7 @@ func userCaseFactory(index int) *userCase { /*{{{*/
         }`,
       UserIdentifier: "smithyrules!",
       loginUser:      "smithyrules!",
-      loginPassword:  `Simple Secret99`,
+      loginPassword:  "Simple Secret99",
       expector: func(auResp *UserResponse, ur *UserDbRow, t *testing.T) {
         checkForAttention(auResp.ValidationResult.SystemRef, t)
         checkBadValidationResult(t, "SysUserId", "Does not match UUID in URL", auResp)
@@ -589,9 +615,9 @@ func userCaseFactory(index int) *userCase { /*{{{*/
     return nil
   }
   return nil
-} /*}}}*/
+}
 
-func getEmail(eAddr string) (bod string, err error) { /*{{{*/
+func getEmail(eAddr string) (bod string, err error) {
 
   mailbox := eAddr[:strings.Index(eAddr, "@")]
   var mailFile = "/tmp/mailbot.boxes/" + mailbox
@@ -614,9 +640,9 @@ func getEmail(eAddr string) (bod string, err error) { /*{{{*/
   }
 
   return "", err
-} /*}}}*/
+}
 
-func compareEmailValues(expectEmailAddr string, expectToken string, t *testing.T) { /*{{{*/
+func compareEmailValues(expectEmailAddr string, expectToken string, t *testing.T) {
 
   email, err := getEmail(expectEmailAddr)
   if err != nil {
@@ -652,9 +678,9 @@ func compareEmailValues(expectEmailAddr string, expectToken string, t *testing.T
   if vr.ValidationResult.Status != StatusOK {
     t.Errorf("Expected OK status after verification but got=%s", vr.ValidationResult.Status)
   }
-} /*}}}*/
+}
 
-func Test_AddUser(t *testing.T) { /*{{{*/
+func Test_AddUser(t *testing.T) {
 
   for i := 0; ; i++ {
     c := userCaseFactory(i)
@@ -716,11 +742,11 @@ func Test_AddUser(t *testing.T) { /*{{{*/
     }
   }
 
-} /*}}}*/
+}
 
 // Request body is not JSON
-func Test_doUser_Bad_JSON(t *testing.T) { /*{{{*/
-  u, err := doTestUser(t, "", `{ I am not valid JSON }`)
+func Test_doUser_Bad_JSON(t *testing.T) {
+  u, err := doTestUser(t, "", "{ I am not valid JSON }")
   if err != nil {
     t.FailNow()
   }
@@ -733,7 +759,7 @@ func Test_doUser_Bad_JSON(t *testing.T) { /*{{{*/
   if expect != u.ValidationResult.Message[0:len(expect)] {
     t.Errorf("Bad validation result message: %s", u.ValidationResult.Message)
   }
-} /*}}}*/
+}
 
 // Table of doTestUser request that fail validation, along with their expected error message
 type validationCase struct {
@@ -742,7 +768,7 @@ type validationCase struct {
   description string
 }
 
-func Test_AddUser_validation(t *testing.T) { /*{{{*/
+func Test_AddUser_validation(t *testing.T) {
 
   var cases []validationCase = []validationCase{
     {`{ "EmailAddr": "", "UserId": "JDoe99", "FirstName": "Jane", "LastName": "Doe", "TzName": "America/Los_Angeles", "ClearPassword": "  \u0009ODd-Pas{}[ ]( )*\\Re\"d/\\s  ", "ConfirmPassword": "  \u0009ODd-Pas{}[ ]( )*\\Re\"d/\\s  ", "ValidationResult": { "Status": "", "Message":"", "SystemRef":"", "PropInError":"", "PropErrorMsg":"" }}`,
@@ -816,7 +842,7 @@ func Test_AddUser_validation(t *testing.T) { /*{{{*/
     }
 
   }
-} /*}}}*/
+}
 
 type verificationCase struct {
   EmailAddr string
@@ -824,7 +850,7 @@ type verificationCase struct {
   Expected  Result
 }
 
-func Test_EmailAddr_Verification_Failures(t *testing.T) { /*{{{*/
+func Test_EmailAddr_Verification_Failures(t *testing.T) {
 
   const typicalMessage = "Verification failed"
   cases := []verificationCase{
@@ -858,9 +884,9 @@ func Test_EmailAddr_Verification_Failures(t *testing.T) { /*{{{*/
       t.Errorf("Expected status=%s but got=%s", cur.Expected.PropErrorMsg, vr.ValidationResult.PropErrorMsg)
     }
   }
-} /*}}}*/
+}
 
-func doTestLogin(t *testing.T, body string) (r *LoginResponse, err error) { /*{{{*/
+func doTestLogin(t *testing.T, body string) (r *LoginResponse, err error) {
 
   client := initClient()
   r = new(LoginResponse)
@@ -869,7 +895,7 @@ func doTestLogin(t *testing.T, body string) (r *LoginResponse, err error) { /*{{
 
   addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
   req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/session/login", addr), c1)
-  req.Header.Set(`User-Agent`, SavedUserAgent)
+  req.Header.Set("User-Agent", SavedUserAgent)
   if err != nil {
     t.Fatalf("Failed to create a request: %s", err)
     return r, err
@@ -901,11 +927,11 @@ func doTestLogin(t *testing.T, body string) (r *LoginResponse, err error) { /*{{
   }
 
   return r, err
-} /*}}}*/
+}
 
 // Request body is not JSON
-func Test_Login_Bad_JSON(t *testing.T) { /*{{{*/
-  r, err := doTestLogin(t, `{ I am not valid JSON }`)
+func Test_Login_Bad_JSON(t *testing.T) {
+  r, err := doTestLogin(t, "{ I am not valid JSON }")
   if err != nil {
     t.FailNow()
   }
@@ -918,7 +944,7 @@ func Test_Login_Bad_JSON(t *testing.T) { /*{{{*/
   if expect != r.ValidationResult.Message[0:len(expect)] {
     t.Errorf("Bad validation result message: %s", r.ValidationResult.Message)
   }
-} /*}}}*/
+}
 
 type loginCase struct {
   desc          string
@@ -928,7 +954,7 @@ type loginCase struct {
   expectLogMsg  string
 }
 
-func loginCaseFactory(index int) *loginCase { /*{{{*/
+func loginCaseFactory(index int) *loginCase {
 
   switch index {
   case 0:
@@ -967,9 +993,9 @@ func loginCaseFactory(index int) *loginCase { /*{{{*/
     return nil
   }
   return nil
-} /*}}}*/
+}
 
-func doLoginCase(cur *loginCase, t *testing.T) { /*{{{*/
+func doLoginCase(cur *loginCase, t *testing.T) {
 
   r, err := doTestLogin(t, cur.bod)
   if err != nil {
@@ -1056,11 +1082,11 @@ func doLoginCase(cur *loginCase, t *testing.T) { /*{{{*/
   if !found {
     t.Fatalf("Logs did not contain \"%s\" in %d log rows", cur.expectLogMsg, len(logs))
   }
-} /*}}}*/
+}
 
-func Test_Login_table(t *testing.T) { /*{{{*/
+func Test_Login_table(t *testing.T) {
 
-  const tempToken = `6ba7b814-9dad-11d1-80b4-00c04fd430c8`
+  const tempToken = "6ba7b814-9dad-11d1-80b4-00c04fd430c8"
 
   for i := 0; i < 1000; i++ {
     cur := loginCaseFactory(i)
@@ -1098,9 +1124,9 @@ func Test_Login_table(t *testing.T) { /*{{{*/
       }
     }
   }
-} /*}}}*/
+}
 
-func fetchLog(withPrefix string) (logMessages []string, err error) { /*{{{*/
+func fetchLog(withPrefix string) (logMessages []string, err error) {
   // retrieve the log messages
   logsql := fmt.Sprintf("select msg from session.log where position('%s' in msg) > 0", withPrefix)
   logMessages = make([]string, 0, 1000)
@@ -1122,7 +1148,7 @@ func fetchLog(withPrefix string) (logMessages []string, err error) { /*{{{*/
     return logMessages, err
   }
   return logMessages, nil
-} /*}}}*/
+}
 
 type logoutCase struct {
   desc   string
@@ -1130,7 +1156,7 @@ type logoutCase struct {
   expect string
 }
 
-func doLogoutCase(cur *logoutCase, t *testing.T) { /*{{{*/
+func doLogoutCase(cur *logoutCase, t *testing.T) {
 
   client := initClient()
 
@@ -1142,7 +1168,7 @@ func doLogoutCase(cur *logoutCase, t *testing.T) { /*{{{*/
     t.Fatalf("Failed to create a request: %s", err)
   }
 
-  req.Header.Set(`User-Agent`, SavedUserAgent)
+  req.Header.Set("User-Agent", SavedUserAgent)
   resp, err := client.Do(req)
   if err != nil {
     t.Fatalf("client request failed: %s", err)
@@ -1175,9 +1201,9 @@ func doLogoutCase(cur *logoutCase, t *testing.T) { /*{{{*/
   if !found {
     t.Fatalf("Logs did not contain \"%s\" in %d log rows", cur.expect, len(logs))
   }
-} /*}}}*/
+}
 
-func Test_Logout_table(t *testing.T) { /*{{{*/
+func Test_Logout_table(t *testing.T) {
 
   if SavedSessionToken == "" {
     t.Fatal("Ooops SavedSessionToken is blank")
@@ -1206,9 +1232,9 @@ func Test_Logout_table(t *testing.T) { /*{{{*/
     t.Logf("Case %d: %s", i, c.desc)
     doLogoutCase(&c, t)
   }
-} /*}}}*/
+}
 
-func doResetPassword(t *testing.T, inEmailAddr, expectLogMsg string) { /*{{{*/
+func doResetPassword(t *testing.T, inEmailAddr, expectLogMsg string) {
 
   client := initClient()
   r := new(struct {
@@ -1217,7 +1243,7 @@ func doResetPassword(t *testing.T, inEmailAddr, expectLogMsg string) { /*{{{*/
 
   addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
   req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/session/reset/%s", addr, inEmailAddr), nil)
-  req.Header.Set(`User-Agent`, SavedUserAgent)
+  req.Header.Set("User-Agent", SavedUserAgent)
   if err != nil {
     t.Fatalf("Failed to create a request: %s", err)
   }
@@ -1256,19 +1282,94 @@ func doResetPassword(t *testing.T, inEmailAddr, expectLogMsg string) { /*{{{*/
     t.Fatalf("Logs did not contain \"%s\" in %d log rows", expectLogMsg, len(logs))
   }
 
-} /*}}}*/
+}
+
+func useResetTokenInEmail(t *testing.T, inEmailAddr, expectLogMsg string) {
+  // get the token from the email and use it
+  bod, err := getEmail(inEmailAddr)
+  if err != nil {
+    t.Fatalf("getEmail returned an error: %s", err)
+  }
+
+  // parse out the url
+  ridx := strings.Index(bod, "/reset/")
+  uidx := ridx - 40 // url begins a little before ridx
+  if uidx < 0 {
+    t.Fatalf("Unexpected failure looking for URL")
+  }
+
+  a1 := bod[uidx:]                        // now can search for "http"
+  s1 := a1[strings.Index(a1, "http://"):] // s1: starts at url
+  ResetURL := s1[:strings.Index(s1, "\n")]
+
+  // Use the token by getting the link
+  lr, err := resetEmailTest(ResetURL, t)
+  if err != nil {
+    t.Fatalf("Unexpected error while resetting: %s", err)
+  }
+
+  // TODO check the cookies
+
+  if lr.ValidationResult.Status != StatusOK {
+    t.Errorf("Expected OK status after verification but got=%s", lr.ValidationResult.Status)
+  }
+}
 
 func Test_Reset_fail_bad_address(t *testing.T) {
 
   // Reset email address does not match the email pattern
-  doResetPassword(t, `bad-address`, `Password reset for bad-address failed, bad email address`)
+  doResetPassword(t, "bad-address", "Password reset for bad-address failed, bad email address")
 }
 
 func Test_Reset_fail_unknown_address(t *testing.T) {
   // Email address is not in database
-  doResetPassword(t, `notfound@here.com`, `SelectUser err: sql: no rows in result set`)
-
-  // Reset when token not expired = fails
-  // Reset when token has expired = success
-  // Success 1) Token and expires is stored in database, 2) clearToken in email, 3)
+  doResetPassword(t, "notfound@here.com", "SelectUser err: sql: no rows in result set")
 }
+
+func Test_Reset_on_already_reset(t *testing.T) {
+
+  doResetPassword(t, SavedRow.email_addr, "Created a reset token for email addess "+SavedRow.email_addr)
+
+  ur, err := SelectUser(SavedRow.email_addr)
+  if err != nil {
+    t.Fatalf("SelectUser returned with error: %s", err)
+  }
+
+  SavedRow = ur // update the SavedRow
+
+  // We now have a user who has requested a password reset
+
+  doResetPassword(t, SavedRow.email_addr, "Active reset token already exists for "+SavedRow.email_addr)
+}
+
+func Test_Reset_on_expired_reset(t *testing.T) {
+  // Assert: have a user (SavedRow) who has requested a password reset, need to force the expiration
+  err := SavedRow.expireResetToken()
+  if err != nil {
+    t.Fatalf("expireResetToken returned with error: %s", err)
+  }
+
+  oldResetToken := SavedRow.reset_token
+
+  // get the email to clear all of it
+  _, err = getEmail(SavedRow.email_addr)
+  if err != nil {
+    t.Fatalf("getEmail returned an error: %s", err)
+  }
+
+  doResetPassword(t, SavedRow.email_addr, "Created a reset token for email addess "+SavedRow.email_addr)
+
+  ur, err := SelectUser(SavedRow.email_addr)
+  if err != nil {
+    t.Fatalf("SelectUser returned with error: %s", err)
+  }
+
+  SavedRow = ur // update the SavedRow
+
+  if oldResetToken == SavedRow.reset_token {
+    t.Fatalf("Expected a fresh reset token, but got the expired one")
+  }
+
+}
+
+// Reset token using tests.
