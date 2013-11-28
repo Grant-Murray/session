@@ -6,6 +6,7 @@ import (
   "encoding/hex"
   "fmt"
   "github.com/Grant-Murray/mailbot"
+  "github.com/golang/glog"
   _ "github.com/lib/pq"
   "os"
 )
@@ -29,12 +30,6 @@ type Config struct {
   ServerKey []byte // entered as hex digit string
 
   // *** from database table Session.config ***
-
-  // MaxLogDays determines how long log history is held for
-  MaxLogDays int
-
-  // DebusVerbosely, when true, causes debug statements to be logged
-  DebugVerbosely bool
 
   // SessionTimeout in number of seconds
   SessionTimeout int
@@ -75,21 +70,26 @@ type Config struct {
 }
 
 // Conf is a package global so that it is accessible everywhere.
-// The main program is expected to call config.Open to initialize
-// it.
 var Conf *Config
 
-// bootstrap reads a few things to find the database
+// bootstrap sets DatabaseSource and ServerKey from stdin
 func (c *Config) bootstrap() {
-  scanner := bufio.NewScanner(os.Stdin)
+
+  var scanner *bufio.Scanner
+
+  tfile, err := os.Open("/tmp/session_test.config.bootstrap.input")
+  if err == nil {
+    defer tfile.Close()
+    scanner = bufio.NewScanner(tfile)
+  } else {
+    scanner = bufio.NewScanner(os.Stdin)
+  }
 
   // DatabaseSource
   fmt.Print("Enter the PostgreSQL source string: ")
   scanner.Scan()
   c.DatabaseSource = scanner.Text()
   fmt.Println()
-
-  var err error
 
   // ServerKey
   fmt.Print("Enter the secret server key: ")
@@ -98,7 +98,7 @@ func (c *Config) bootstrap() {
   fmt.Println()
 
   if err = scanner.Err(); err != nil {
-    panic(fmt.Sprintf("Error reading standard input:", err))
+    panic(fmt.Sprintf("Error reading input: %s", err))
   }
 
   c.ServerKey, err = hex.DecodeString(sk)
@@ -108,34 +108,28 @@ func (c *Config) bootstrap() {
 
 }
 
-// Configure reads configuration values from a table
-// and loads them into the global Conf
-func Configure() {
+// reads configuration values from a table and loads them into the global Conf
+func init() {
   var err error
 
-  if Conf == nil {
-    // need to bootstrap
-    Conf = new(Config)
-    Conf.bootstrap()
+  Conf = new(Config)
+  Conf.bootstrap()
 
-    if len(Conf.ServerKey) != 64 {
-      panic(fmt.Sprintf("Serverkey needs to be 64 bytes long exactly, it was only %d bytes", len(Conf.ServerKey)))
-    }
-  } else {
-    // Assert: we are testing
+  if len(Conf.ServerKey) != 64 {
+    panic(fmt.Sprintf("Serverkey needs to be 64 bytes long exactly, it was only %d bytes", len(Conf.ServerKey)))
   }
 
   Conf.DatabaseHandle, err = sql.Open("postgres", Conf.DatabaseSource)
   if err != nil {
     panic(err)
   }
-  rows, err := Conf.DatabaseHandle.Query("SELECT max_log_days, debug_verbosely, session_timeout, session_max_life, https_key, https_cert, https_host, https_port, smtp_server_host, smtp_server_port, smtp_from, smtp_auth_username, smtp_auth_password, verify_template, reset_template, reset_timeout FROM session.config")
+  rows, err := Conf.DatabaseHandle.Query("SELECT session_timeout, session_max_life, https_key, https_cert, https_host, https_port, smtp_server_host, smtp_server_port, smtp_from, smtp_auth_username, smtp_auth_password, verify_template, reset_template, reset_timeout FROM session.config")
   if err != nil {
     panic(err)
   }
 
   for rows.Next() {
-    if err := rows.Scan(&Conf.MaxLogDays, &Conf.DebugVerbosely, &Conf.SessionTimeout, &Conf.SessionMaxLife,
+    if err := rows.Scan(&Conf.SessionTimeout, &Conf.SessionMaxLife,
       &Conf.HttpsKey, &Conf.HttpsCert, &Conf.HttpsHost, &Conf.HttpsPort,
       &Conf.Smtp.Host, &Conf.Smtp.Port, &Conf.Smtp.EmailFrom, &Conf.Smtp.User, &Conf.Smtp.Password,
       &Conf.VerifyTemplate, &Conf.ResetTemplate, &Conf.PasswordResetExpiresDuration); err != nil {
@@ -144,5 +138,9 @@ func Configure() {
   }
   if err := rows.Err(); err != nil {
     panic(err)
+  }
+
+  if glog.V(1) {
+    glog.Info("Configuration loaded from database")
   }
 }

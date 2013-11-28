@@ -6,8 +6,8 @@ import (
   "database/sql"
   "encoding/json"
   "fmt"
-  "github.com/Grant-Murray/logdb"
   "github.com/Grant-Murray/mailbot"
+  "github.com/golang/glog"
   "github.com/gorilla/context"
   "github.com/gorilla/mux"
   uuid "github.com/nu7hatch/gouuid"
@@ -93,19 +93,22 @@ func sendVerifyEmail(td verifyEmailTemplateParams) (err error) {
   tout := new(bytes.Buffer)
   err = tplt.Execute(tout, td)
   if err != nil {
-    logdb.Attn.Printf("Verify template failed to execute addr=%s fn=%s ln=%s tok=%s: %s",
-      td.EmailAddr, td.FirstName, td.LastName, td.Token, err)
+    glog.Errorf("Verify template failed to execute addr=%s fn=%s ln=%s tok=%s: %s", td.EmailAddr, td.FirstName, td.LastName, td.Token, err)
     return err
   }
 
-  logdb.Debug.Printf("Processed template:\n%s", tout.Bytes())
+  if glog.V(2) {
+    glog.Infof("Processed template:\n%s", tout.Bytes())
+  }
 
   err = mailbot.UpgradeTLSSend(Conf.Smtp, "", []string{td.EmailAddr}, tout.Bytes())
   if err != nil {
     return err
   }
 
-  logdb.Info.Printf("Verify email sent to %s %s <%s>", td.FirstName, td.LastName, td.EmailAddr)
+  if glog.V(1) {
+    glog.Infof("Verify email sent to %s %s <%s>", td.FirstName, td.LastName, td.EmailAddr)
+  }
 
   return nil
 }
@@ -124,12 +127,13 @@ func sendResetEmail(td resetEmailTemplateParams) (err error) {
   tout := new(bytes.Buffer)
   err = tplt.Execute(tout, td)
   if err != nil {
-    logdb.Attn.Printf("Reset template failed to execute addr=%s fn=%s ln=%s tok=%s: %s",
-      td.EmailAddr, td.FirstName, td.LastName, td.Token, err)
+    glog.Errorf("Reset template failed to execute addr=%s fn=%s ln=%s tok=%s: %s", td.EmailAddr, td.FirstName, td.LastName, td.Token, err)
     return err
   }
 
-  logdb.Debug.Printf("Processed template:\n%s", tout.Bytes())
+  if glog.V(2) {
+    glog.Infof("Processed template:\n%s", tout.Bytes())
+  }
 
   err = mailbot.UpgradeTLSSend(Conf.Smtp, "", []string{td.EmailAddr}, tout.Bytes())
   if err != nil {
@@ -261,7 +265,7 @@ func validUserRequest(uReq *UserRequest, doingInsert bool, givenSysUserId string
     {
       vResult.PropInError = "TzName"
       vResult.PropErrorMsg = fmt.Sprintf("System error %s", err)
-      logdb.Attn.Printf("Error while executing %s\n($1=%s)\nerr=%s", tzLookupSql, uReq.TzName, err)
+      glog.Errorf("Error while executing %s\n($1=%s)\nerr=%s", tzLookupSql, uReq.TzName, err)
       return false
     }
   default:
@@ -289,7 +293,7 @@ func validUserRequest(uReq *UserRequest, doingInsert bool, givenSysUserId string
     {
       vResult.PropInError = "EmailAddr"
       vResult.PropErrorMsg = fmt.Sprintf("System error %s", err)
-      logdb.Attn.Printf("Error while executing %s\n($1=%s)\nerr=%s", lookupSql, uReq.EmailAddr, err)
+      glog.Errorf("Error while executing %s\n($1=%s)\nerr=%s", lookupSql, uReq.EmailAddr, err)
       return false
     }
   default:
@@ -317,7 +321,7 @@ func validUserRequest(uReq *UserRequest, doingInsert bool, givenSysUserId string
     {
       vResult.PropInError = "UserId"
       vResult.PropErrorMsg = fmt.Sprintf("System error %s", err)
-      logdb.Attn.Printf("Error while executing %s\n($1=%s)\nerr=%s", lookupSql, uReq.UserId, err)
+      glog.Errorf("Error while executing %s\n($1=%s)\nerr=%s", lookupSql, uReq.UserId, err)
       return false
     }
   default:
@@ -341,7 +345,7 @@ func makeSalt() (salt []byte) {
     // success, using crypto/rand
     return salt
   } else {
-    logdb.Attn.Printf("makeSalt failed to use crypto/rand: %s", err)
+    glog.Errorf("makeSalt failed to use crypto/rand: %s", err)
   }
 
   // fallback to math/rand
@@ -365,7 +369,9 @@ func doUser(rw http.ResponseWriter, req *http.Request) {
     givenSysUserId = strings.TrimSpace(vars["SysUserId"])
   }
 
-  logdb.Debug.Printf("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  if glog.V(2) {
+    glog.Infof("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  }
 
   uReq := new(UserRequest)
   uResp := new(UserResponse)
@@ -381,34 +387,43 @@ func doUser(rw http.ResponseWriter, req *http.Request) {
     rw.Header().Add("Content-Type", "application/json")
     err = enc.Encode(uResp)
     if err != nil {
-      logdb.Attn.Printf("%s Failed to encode response into json", localPrefix)
+      glog.Errorf("%s Failed to encode response into json", localPrefix)
     }
 
-    logdb.Debug.Printf("%s handling ends with result message: %s", localPrefix, uResp.ValidationResult.Message)
+    if glog.V(2) {
+      glog.Infof("%s handling ends with result message: %s", localPrefix, uResp.ValidationResult.Message)
+    }
+    glog.Flush()
   }()
 
   // decode json to struct
   dec := json.NewDecoder(req.Body)
   err = dec.Decode(uReq)
   if err != nil {
-    logdb.Attn.Printf("%s Failure while decoding json: %s", localPrefix, err)
+    glog.Errorf("%s Failure while decoding json: %s", localPrefix, err)
     uResp.ValidationResult.Message = fmt.Sprintf("Could not decode the request, got error: %s", err)
     return
   }
-  logdb.Debug.Printf("%s decoded JSON request", localPrefix)
+  if glog.V(2) {
+    glog.Infof("%s decoded JSON request", localPrefix)
+  }
 
   if !doingInsert {
     creds := context.Get(req, CredentialsKey).(*LoginResponse)
 
     if creds.ValidationResult.Status != StatusOK {
-      logdb.Debug.Printf("%s attempt to modify user stopped, invalid session", localPrefix)
+      if glog.V(2) {
+        glog.Infof("%s attempt to modify user stopped, invalid session", localPrefix)
+      }
       uResp.ValidationResult.Message = "Authentication failure, cannot change profile"
       return
     }
 
     if creds.SysUserId != givenSysUserId {
       // TODO Feature: an administrator would need to be logged in and authorized
-      logdb.Debug.Printf("%s attempt to modify user stopped, logged in user is not profile user", localPrefix)
+      if glog.V(2) {
+        glog.Infof("%s attempt to modify user stopped, logged in user is not profile user", localPrefix)
+      }
       uResp.ValidationResult.Message = "Authentication failure, cannot change another users profile"
       return
     }
@@ -459,9 +474,13 @@ func doUser(rw http.ResponseWriter, req *http.Request) {
 
     if oldRow.email_addr == userRow.email_addr {
       emailChanged = false
-      logdb.Debug.Printf("%s Email address unchanged %s", localPrefix, userRow.email_addr)
+      if glog.V(2) {
+        glog.Infof("%s Email address unchanged %s", localPrefix, userRow.email_addr)
+      }
     } else {
-      logdb.Debug.Printf("%s Email address changed from %s --> %s", localPrefix, oldRow.email_addr, userRow.email_addr)
+      if glog.V(2) {
+        glog.Infof("%s Email address changed from %s --> %s", localPrefix, oldRow.email_addr, userRow.email_addr)
+      }
     }
   }
 
@@ -501,13 +520,14 @@ func doUser(rw http.ResponseWriter, req *http.Request) {
     if err != nil {
       // change the message but behave like success
       uResp.ValidationResult.Message = x + " successfully, but email for verification failed to send"
-      logdb.Attn.Printf("%s Failure attempting to send email: %s", localPrefix, err)
+      glog.Errorf("%s Failure attempting to send email: %s", localPrefix, err)
       return
     }
   }
 
-  logdb.Info.Printf("%s %s: id=%s em=%s fn=%s ln=%s sys=%s",
-    localPrefix, x, uReq.UserId, uReq.EmailAddr, uReq.FirstName, uReq.LastName, uResp.SysUserId)
+  if glog.V(1) {
+    glog.Infof("%s %s: id=%s em=%s fn=%s ln=%s sys=%s", localPrefix, x, uReq.UserId, uReq.EmailAddr, uReq.FirstName, uReq.LastName, uResp.SysUserId)
+  }
 
   // BUG(glm) Feature?: Send an email to the administrator, when a new user registers. This obviously would only be switched on for cases where the userbase is small.
 
@@ -523,7 +543,9 @@ type VerifyResponse struct {
 
 func verifyEmail(rw http.ResponseWriter, req *http.Request) {
   localPrefix := fmt.Sprintf("verifyEmail-%s:", context.Get(req, RequestLogIdKey))
-  logdb.Debug.Printf("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  if glog.V(2) {
+    glog.Infof("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  }
 
   vars := mux.Vars(req)
   var response VerifyResponse
@@ -541,10 +563,13 @@ func verifyEmail(rw http.ResponseWriter, req *http.Request) {
     rw.Header().Add("Content-Type", "application/json")
     err = enc.Encode(response)
     if err != nil {
-      logdb.Attn.Printf("%s Failed to encode response into json", localPrefix)
+      glog.Errorf("%s Failed to encode response into json", localPrefix)
     }
 
-    logdb.Debug.Printf("%s handling ends with result message: %s", localPrefix, response.ValidationResult.Message)
+    if glog.V(2) {
+      glog.Infof("%s handling ends with result message: %s", localPrefix, response.ValidationResult.Message)
+    }
+    glog.Flush()
   }()
 
   // check if email matches the pattern
@@ -566,18 +591,22 @@ func verifyEmail(rw http.ResponseWriter, req *http.Request) {
   const sql = "update session.user set verify_token = null, email_verified = true where email_addr = $1 and verify_token = $2"
   result, err := Conf.DatabaseHandle.Exec(sql, response.EmailAddr, response.Token)
   if err != nil {
-    logdb.Debug.Printf("%s Attempt to verify failed: %s", localPrefix, err)
+    if glog.V(2) {
+      glog.Infof("%s Attempt to verify failed: %s", localPrefix, err)
+    }
     return
   }
 
   rows, err := result.RowsAffected()
   if err != nil {
-    logdb.Attn.Printf("%s Error while calling RowsAffected: %s", localPrefix, err)
+    glog.Errorf("%s Error while calling RowsAffected: %s", localPrefix, err)
     return
   }
 
   if rows > 0 {
-    logdb.Info.Printf("%s Email verification of %s. (%d rows updated)", localPrefix, response.EmailAddr, rows)
+    if glog.V(1) {
+      glog.Infof("%s Email verification of %s. (%d rows updated)", localPrefix, response.EmailAddr, rows)
+    }
     response.ValidationResult.Message = "Verification successful"
     response.ValidationResult.Status = StatusOK
   }
@@ -660,7 +689,9 @@ func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginReques
   if loginReq.UserIdentifier == "" {
     loginResp.ValidationResult.PropInError = "UserIdentifier"
     loginResp.ValidationResult.PropErrorMsg = "Missing data"
-    logdb.Debug.Printf("%s blank user identifier", localPrefix)
+    if glog.V(2) {
+      glog.Infof("%s blank user identifier", localPrefix)
+    }
     return
   }
 
@@ -670,7 +701,9 @@ func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginReques
   if loginReq.ClearPassword == "" && loginReq.SessionToken == "" {
     loginResp.ValidationResult.PropInError = "ClearPassword"
     loginResp.ValidationResult.PropErrorMsg = "Missing data"
-    logdb.Debug.Printf("%s blank password", localPrefix)
+    if glog.V(2) {
+      glog.Infof("%s blank password", localPrefix)
+    }
     return
   }
 
@@ -681,7 +714,9 @@ func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginReques
 
   userRow, err := SelectUser(loginReq.UserIdentifier)
   if err != nil {
-    logdb.Debug.Printf("%s SelectUser err: %s", localPrefix, err)
+    if glog.V(2) {
+      glog.Infof("%s SelectUser err: %s", localPrefix, err)
+    }
     return
   }
 
@@ -692,14 +727,18 @@ func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginReques
   if loginUsingPassword {
     // Check if password matches
     if !userRow.PasswordMatches(loginReq.ClearPassword) {
-      logdb.Debug.Printf("%s passwords did not match", localPrefix)
+      if glog.V(2) {
+        glog.Infof("%s passwords did not match", localPrefix)
+      }
       return
     }
   } else {
     // Check if the session is not expired
     sessionRow, err := SelectValidSession(csi)
     if err != nil || sessionRow == nil {
-      logdb.Debug.Printf("%s Error during SelectValidSession call: %s", localPrefix, err)
+      if glog.V(2) {
+        glog.Infof("%s Error during SelectValidSession call: %s", localPrefix, err)
+      }
       loginResp.ValidationResult.PropInError = "SessionToken"
       loginResp.ValidationResult.PropErrorMsg = "Invalid data"
       return
@@ -708,19 +747,25 @@ func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginReques
     // QUESTION: If a user is roaming on a cellular network, does their IP address change?
     //           If yes, then this check may be incorrect.
     if ipAddress != sessionRow.ip_addr {
-      logdb.Debug.Printf("%s IP address changed from %s to %s, cannot use session token to login", localPrefix, sessionRow.ip_addr, ipAddress)
+      if glog.V(2) {
+        glog.Infof("%s IP address changed from %s to %s, cannot use session token to login", localPrefix, sessionRow.ip_addr, ipAddress)
+      }
       return
     }
 
     if userAgent != sessionRow.user_agent {
-      logdb.Debug.Printf("%s user agent changed from %s to %s, cannot use session token to login", localPrefix, userAgent, sessionRow.user_agent)
+      if glog.V(2) {
+        glog.Infof("%s user agent changed from %s to %s, cannot use session token to login", localPrefix, userAgent, sessionRow.user_agent)
+      }
       return
     }
   }
 
   // Check if login allowed
   if !userRow.login_allowed {
-    logdb.Debug.Printf("%s login not permitted", localPrefix)
+    if glog.V(2) {
+      glog.Infof("%s login not permitted", localPrefix)
+    }
     loginResp.ValidationResult.Message = "Login is not permitted"
     return
   }
@@ -728,17 +773,19 @@ func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginReques
   // Check if email is verified
   if !userRow.email_verified {
     if len(userRow.verify_token) != 36 {
-      logdb.Attn.Printf("%s email_verified is false, but verify_token is invalid on user %s", localPrefix, userRow.email_addr)
+      glog.Errorf("%s email_verified is false, but verify_token is invalid on user %s", localPrefix, userRow.email_addr)
     }
 
-    logdb.Debug.Printf("%s login not permitted with unverified email address", localPrefix)
+    if glog.V(2) {
+      glog.Infof("%s login not permitted with unverified email address", localPrefix)
+    }
     loginResp.ValidationResult.Message = fmt.Sprintf("Login is not permitted with unverified email address. Email was sent to %s", userRow.email_addr)
 
     // resend email to prompt for verification
     err = sendVerifyEmail(verifyEmailTemplateParams{EmailAddr: userRow.email_addr, FirstName: userRow.first_name, LastName: userRow.last_name, Token: userRow.verify_token})
     if err != nil {
       loginResp.ValidationResult.Message = fmt.Sprintf("Login is not permitted with unverified email address. In addition, the system failed to resend to %s", userRow.email_addr)
-      logdb.Attn.Printf("%s Failure attempting to resend email: %s", localPrefix, err)
+      glog.Errorf("%s Failure attempting to resend email: %s", localPrefix, err)
     }
 
     return
@@ -790,8 +837,9 @@ func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginReques
   if loginUsingPassword {
     t = "using password"
   }
-  logdb.Info.Printf("%s Session %s %s for SysUserId %s", localPrefix,
-    loginResp.SessionToken[:8], t, loginResp.SysUserId)
+  if glog.V(1) {
+    glog.Infof("%s Session %s %s for SysUserId %s", localPrefix, loginResp.SessionToken[:8], t, loginResp.SysUserId)
+  }
 
 }
 
@@ -814,7 +862,9 @@ func VerifyIdentity(logTag, userId string, sess ClearSessionId, ipAddress, userA
   }
 
   localPrefix := fmt.Sprintf("Verify-%s: for SessionToken %s", logTag, sess.SessionToken[:8])
-  logdb.Debug.Printf("%s handling begins", localPrefix)
+  if glog.V(2) {
+    glog.Infof("%s handling begins", localPrefix)
+  }
 
   // clear out all stale and dirty(modified) cache entries
   for k, v := range vCache {
@@ -833,10 +883,14 @@ func VerifyIdentity(logTag, userId string, sess ClearSessionId, ipAddress, userA
 
   if entry.response != nil {
     // return the cached response since it is not stale
-    logdb.Debug.Printf("%s cache hit", localPrefix)
+    if glog.V(2) {
+      glog.Infof("%s cache hit", localPrefix)
+    }
     return entry.response
   } else {
-    logdb.Debug.Printf("%s cache miss", localPrefix)
+    if glog.V(2) {
+      glog.Infof("%s cache miss", localPrefix)
+    }
   }
 
   req := LoginRequest{UserIdentifier: userId, SessionToken: sess.SessionToken, Salt: sess.Salt}
@@ -844,7 +898,7 @@ func VerifyIdentity(logTag, userId string, sess ClearSessionId, ipAddress, userA
   genericLogin(localPrefix, ipAddress, userAgent, req, resp)
 
   if resp == nil {
-    logdb.Attn.Printf("%s genericLogin returned nil, but it never should", localPrefix)
+    glog.Errorf("%s genericLogin returned nil, but it never should", localPrefix)
     resp = new(LoginResponse)
     resp.ValidationResult = Result{Status: StatusInvalid, Message: "System error",
       SystemRef: "Verify", PropInError: "", PropErrorMsg: ""}
@@ -853,7 +907,9 @@ func VerifyIdentity(logTag, userId string, sess ClearSessionId, ipAddress, userA
 
   if resp.ValidationResult.Status != StatusOK {
     // do not cache the authentication failures
-    logdb.Debug.Printf("%s: %s", localPrefix, resp.ValidationResult.Message)
+    if glog.V(2) {
+      glog.Infof("%s: %s", localPrefix, resp.ValidationResult.Message)
+    }
     return resp
   }
 
@@ -865,14 +921,18 @@ func VerifyIdentity(logTag, userId string, sess ClearSessionId, ipAddress, userA
 
   vCache[cacheKey] = verifyCacheEntry{staleAfter: time.Now().Add(time.Duration(secondsToLive) * time.Second),
     response: resp}
-  logdb.Debug.Printf("%s: cached response and finished: %s", localPrefix, resp.ValidationResult.Message)
+  if glog.V(2) {
+    glog.Infof("%s: cached response and finished: %s", localPrefix, resp.ValidationResult.Message)
+  }
 
   return resp
 }
 
 func doLogin(rw http.ResponseWriter, req *http.Request) {
   localPrefix := fmt.Sprintf("doLogin-%s:", context.Get(req, RequestLogIdKey))
-  logdb.Debug.Printf("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  if glog.V(2) {
+    glog.Infof("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  }
 
   loginReq := new(LoginRequest)
   loginResp := DefaultLoginResponse(localPrefix)
@@ -902,16 +962,19 @@ func doLogin(rw http.ResponseWriter, req *http.Request) {
       Expires: time.Now().Add(time.Duration(loginResp.SessionTTL) * time.Second)})
     err = enc.Encode(loginResp)
     if err != nil {
-      logdb.Attn.Printf("%s Failed to encode response into json", localPrefix)
+      glog.Errorf("%s Failed to encode response into json", localPrefix)
     }
-    logdb.Debug.Printf("%s handling ends with result message: %s", localPrefix, loginResp.ValidationResult.Message)
+    if glog.V(2) {
+      glog.Infof("%s handling ends with result message: %s", localPrefix, loginResp.ValidationResult.Message)
+    }
+    glog.Flush()
   }()
 
   // decode json to struct
   dec := json.NewDecoder(req.Body)
   err = dec.Decode(loginReq)
   if err != nil {
-    logdb.Attn.Printf("%s Failure while decoding json: %s", localPrefix, err)
+    glog.Errorf("%s Failure while decoding json: %s", localPrefix, err)
     loginResp.ValidationResult.Message = fmt.Sprintf("Could not decode the request, got error: %s", err)
     return
   }
@@ -926,7 +989,9 @@ func doLogin(rw http.ResponseWriter, req *http.Request) {
 /* getResetToken takes a url of the form "/session/reset/{EmailAddr}" and sends an email to the given EmailAddr the response is the same as in doLogout, a SystemRef is the only datum returned. No indication of success or failure, on purpose. */
 func getResetToken(rw http.ResponseWriter, req *http.Request) {
   localPrefix := fmt.Sprintf("getResetToken-%s:", context.Get(req, RequestLogIdKey))
-  logdb.Debug.Printf("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  if glog.V(2) {
+    glog.Infof("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  }
 
   vars := mux.Vars(req)
   inEmailAddr := strings.TrimSpace(strings.ToLower(vars["EmailAddr"]))
@@ -937,49 +1002,66 @@ func getResetToken(rw http.ResponseWriter, req *http.Request) {
     // encode response to json and write the response
     rw.Header().Add("Content-Type", "application/json")
     rw.Write([]byte(fmt.Sprintf("{ \"SystemRef\": \"%s\" }", localPrefix)))
-    logdb.Debug.Printf("%s handling ends", localPrefix)
+    if glog.V(2) {
+      glog.Infof("%s handling ends", localPrefix)
+    }
+    glog.Flush()
   }()
 
   // check if email matches the pattern
   if isMatched, _ := regexp.MatchString(emailRegex, inEmailAddr); !isMatched {
-    logdb.Debug.Printf("%s Password reset for %s failed, bad email address", localPrefix, inEmailAddr)
+    if glog.V(2) {
+      glog.Infof("%s Password reset for %s failed, bad email address", localPrefix, inEmailAddr)
+    }
     return
   }
 
   // fetch the user
   userRow, err := SelectUser(inEmailAddr)
   if err != nil {
-    logdb.Debug.Printf("%s SelectUser err: %s", localPrefix, err)
+    if glog.V(2) {
+      glog.Infof("%s SelectUser err: %s", localPrefix, err)
+    }
     return
   }
 
   // check if sufficient time has passed
   if len(userRow.reset_token) > 1 && userRow.reset_expires.After(time.Now()) {
-    logdb.Debug.Printf("%s Active reset token already exists for %s", localPrefix, inEmailAddr)
+    if glog.V(2) {
+      glog.Infof("%s Active reset token already exists for %s", localPrefix, inEmailAddr)
+    }
     return
   }
 
   clearResetToken, err := userRow.UpdateResetToken()
   if err != nil {
-    logdb.Debug.Printf("%s UpdateResetToken err: %s", localPrefix, err)
+    if glog.V(2) {
+      glog.Infof("%s UpdateResetToken err: %s", localPrefix, err)
+    }
     return
   }
-  logdb.Debug.Printf("%s Created a reset token for email addess %s (sys_user_id=%s)", localPrefix, inEmailAddr, userRow.sys_user_id)
+  if glog.V(2) {
+    glog.Infof("%s Created a reset token for email addess %s (sys_user_id=%s)", localPrefix, inEmailAddr, userRow.sys_user_id)
+  }
 
   // send the email
   err = sendResetEmail(resetEmailTemplateParams{EmailAddr: userRow.email_addr, FirstName: userRow.first_name, LastName: userRow.last_name, Token: clearResetToken})
   if err != nil {
-    logdb.Attn.Printf("%s Failure attempting to send the reset email: %s", localPrefix, err)
+    glog.Errorf("%s Failure attempting to send the reset email: %s", localPrefix, err)
     return
   }
-  logdb.Info.Printf("%s Password reset email sent to %s %s <%s>", localPrefix, userRow.first_name, userRow.last_name, inEmailAddr)
+  if glog.V(1) {
+    glog.Infof("%s Password reset email sent to %s %s <%s>", localPrefix, userRow.first_name, userRow.last_name, inEmailAddr)
+  }
 
 }
 
 // useResetToken creates a login session and returns the session cookies so that a user can change their password, for valid reset tokens only (also verifies email address)
 func useResetToken(rw http.ResponseWriter, req *http.Request) {
   localPrefix := fmt.Sprintf("useReset-%s:", context.Get(req, RequestLogIdKey))
-  logdb.Debug.Printf("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  if glog.V(2) {
+    glog.Infof("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  }
 
   vars := mux.Vars(req)
   inEmailAddr := strings.TrimSpace(strings.ToLower(vars["EmailAddr"]))
@@ -996,10 +1078,13 @@ func useResetToken(rw http.ResponseWriter, req *http.Request) {
     rw.Header().Add("Content-Type", "application/json")
     err = enc.Encode(response)
     if err != nil {
-      logdb.Attn.Printf("%s Failed to encode response into json", localPrefix)
+      glog.Errorf("%s Failed to encode response into json", localPrefix)
     }
 
-    logdb.Debug.Printf("%s handling ends with result message: %s", localPrefix, response.ValidationResult.Message)
+    if glog.V(2) {
+      glog.Infof("%s handling ends with result message: %s", localPrefix, response.ValidationResult.Message)
+    }
+    glog.Flush()
   }()
 
   // check if email matches the pattern
@@ -1020,35 +1105,47 @@ func useResetToken(rw http.ResponseWriter, req *http.Request) {
   // fetch the user
   userRow, err := SelectUser(inEmailAddr)
   if err != nil {
-    logdb.Debug.Printf("%s SelectUser err: %s", localPrefix, err)
+    if glog.V(2) {
+      glog.Infof("%s SelectUser err: %s", localPrefix, err)
+    }
     return
   }
 
   // tokens must match
   cryptToken, err := encryptResetToken(inResetToken, userRow.sys_user_id)
   if err != nil {
-    logdb.Debug.Printf("%s encryptResetToken err: %s", localPrefix, err)
+    if glog.V(2) {
+      glog.Infof("%s encryptResetToken err: %s", localPrefix, err)
+    }
     return
   }
 
   if userRow.reset_token == "" {
-    logdb.Debug.Printf("%s No token in database", localPrefix)
+    if glog.V(2) {
+      glog.Infof("%s No token in database", localPrefix)
+    }
     return
   }
 
   if cryptToken != userRow.reset_token {
-    logdb.Debug.Printf("%s Given token does not match the token on record", localPrefix)
+    if glog.V(2) {
+      glog.Infof("%s Given token does not match the token on record", localPrefix)
+    }
     return
   }
 
   // token must be active not expired
   if userRow.reset_expires.Before(time.Now()) {
-    logdb.Debug.Printf("%s Reset token is expired", localPrefix)
+    if glog.V(2) {
+      glog.Infof("%s Reset token is expired", localPrefix)
+    }
     return
   }
 
   if err = userRow.RemoveResetToken(); err != nil {
-    logdb.Debug.Printf("%s RemoveResetToken err: %s", localPrefix, err)
+    if glog.V(2) {
+      glog.Infof("%s RemoveResetToken err: %s", localPrefix, err)
+    }
     return
   }
 
@@ -1064,21 +1161,26 @@ type LogoutRequest struct {
 // doLogout deletes the session record and returns no response
 func doLogout(rw http.ResponseWriter, req *http.Request) {
   localPrefix := fmt.Sprintf("doLogout-%s:", context.Get(req, RequestLogIdKey))
-  logdb.Debug.Printf("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  if glog.V(2) {
+    glog.Infof("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  }
 
   logoutReq := new(LogoutRequest)
 
   defer func() {
     rw.Header().Add("Content-Type", "application/json")
     rw.Write([]byte(fmt.Sprintf("{ \"SystemRef\": \"%s\" }", localPrefix)))
-    logdb.Debug.Printf("%s handling ends", localPrefix)
+    if glog.V(2) {
+      glog.Infof("%s handling ends", localPrefix)
+    }
+    glog.Flush()
   }()
 
   // decode json to struct
   dec := json.NewDecoder(req.Body)
   err := dec.Decode(logoutReq)
   if err != nil {
-    logdb.Attn.Printf("%s Failure while decoding json: %s", localPrefix, err)
+    glog.Errorf("%s Failure while decoding json: %s", localPrefix, err)
     return
   }
 
@@ -1091,21 +1193,29 @@ func doLogout(rw http.ResponseWriter, req *http.Request) {
 
   rows, err := DeleteSession(csi)
   if err != nil {
-    logdb.Debug.Printf("%s Invalid logout request received: %s", localPrefix, err)
+    if glog.V(2) {
+      glog.Infof("%s Invalid logout request received: %s", localPrefix, err)
+    }
     return
   }
 
   if rows > 0 {
-    logdb.Info.Printf("%s Logout of SessionToken %s (%d row deleted)", localPrefix, logoutReq.SessionToken[:8], rows)
+    if glog.V(1) {
+      glog.Infof("%s Logout of SessionToken %s (%d row deleted)", localPrefix, logoutReq.SessionToken[:8], rows)
+    }
   } else {
-    logdb.Debug.Printf("%s No such session %s to delete", localPrefix, logoutReq.SessionToken[:8])
+    if glog.V(2) {
+      glog.Infof("%s No such session %s to delete", localPrefix, logoutReq.SessionToken[:8])
+    }
   }
 }
 
 // getLogin is a like logging in using only the cookie values
 func getLogin(rw http.ResponseWriter, req *http.Request) {
   localPrefix := fmt.Sprintf("getLogin-%s:", context.Get(req, RequestLogIdKey))
-  logdb.Debug.Printf("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  if glog.V(2) {
+    glog.Infof("%s handling begins: %s (%d bytes)", localPrefix, req.URL, req.ContentLength)
+  }
 
   loginResp := context.Get(req, CredentialsKey).(*LoginResponse)
   rw.Header().Add("Content-Type", "application/json")
@@ -1114,9 +1224,11 @@ func getLogin(rw http.ResponseWriter, req *http.Request) {
   enc := json.NewEncoder(rw)
   err := enc.Encode(loginResp)
   if err != nil {
-    logdb.Attn.Printf("%s Failed to encode response into json", localPrefix)
+    glog.Errorf("%s Failed to encode response into json", localPrefix)
   }
-  logdb.Debug.Printf("%s handling ends with result message: %s", localPrefix, loginResp.ValidationResult.Message)
+  if glog.V(2) {
+    glog.Infof("%s handling ends with result message: %s", localPrefix, loginResp.ValidationResult.Message)
+  }
 }
 
 func checkCredentials(req *http.Request) {
@@ -1151,7 +1263,9 @@ func checkCredentials(req *http.Request) {
   context.Set(req, CredentialsKey, c)
   context.Set(req, CurrentSessionKey, SessionTokenCookie+SaltCookie)
 
-  logdb.Debug.Printf("%s Status:%s Message:%s", localPrefix, c.ValidationResult.Status, c.ValidationResult.Message)
+  if glog.V(2) {
+    glog.Infof("%s Status:%s Message:%s", localPrefix, c.ValidationResult.Status, c.ValidationResult.Message)
+  }
 
 }
 
@@ -1159,11 +1273,13 @@ func Handler(rw http.ResponseWriter, req *http.Request) {
 
   requestLogId, err := rand.Int(rand.Reader, big.NewInt(999999))
   if err != nil {
-    logdb.Attn.Printf("Failed to get a random number. Err:%s", err)
+    glog.Errorf("Failed to get a random number. Err:%s", err)
   }
 
   context.Set(req, RequestLogIdKey, fmt.Sprintf("%06d", requestLogId))
-  logdb.Debug.Printf("Session request tagged %06d started with url: %s", requestLogId, req.URL)
+  if glog.V(2) {
+    glog.Infof("Session request tagged %06d started with url: %s", requestLogId, req.URL)
+  }
 
   checkCredentials(req)
 

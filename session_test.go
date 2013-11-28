@@ -8,11 +8,10 @@ This server key used in these tests needs to match the one used in the running s
 package session
 
 import (
+  "bufio"
   "crypto/tls"
-  "encoding/hex"
   "encoding/json"
   "fmt"
-  "github.com/Grant-Murray/logdb"
   uuid "github.com/nu7hatch/gouuid"
   "io/ioutil"
   "net/http"
@@ -35,6 +34,10 @@ var (
   SavedCookieJar     http.CookieJar
 )
 
+const (
+  LOGFILENAME = "/tmp/sessiond.glog/sessiond.INFO"
+)
+
 func initClient() *http.Client {
 
   tt := new(http.Transport) // tt => testing transport
@@ -46,34 +49,7 @@ func initClient() *http.Client {
   return client
 }
 
-func TestSetup(t *testing.T) {
-  // Test only bootstrap method
-  Conf = new(Config)
-  Conf.DatabaseSource = "user=postgres password='with spaces' dbname=sessdb host=localhost port=5432 sslmode=disable"
-
-  // This server key needs to match the one used in the running sessiond
-  var err error
-  sk := "fa1725ba8034485170912d8c29d4ef118f3fddd43e21437f0ee167835921b786d4bc6f52027fb858e6a138d6dfa1875d4ec12488464af3dbe79984bc23ffdece"
-  Conf.ServerKey, err = hex.DecodeString(sk)
-  if err != nil {
-    panic(fmt.Sprintf("Failed to convert SERVERKEY: %s", err))
-  }
-
-  Configure()
-
-  err = logdb.Initialize(Conf.DatabaseHandle, "", "INSERT INTO session.log (entered, msg, level) VALUES (now(), $1, $2)")
-  if err != nil {
-    panic(fmt.Sprintf("Failed to initialize logdb: %s", err))
-  }
-  logdb.Info.Print("--- Test runner started ---")
-
-}
-
 func Test_Config(t *testing.T) {
-  if Conf.MaxLogDays != 5 {
-    t.Fatalf("FAIL: MaxLogDays had an unexpected value")
-  }
-
   if Conf.Smtp.Host != "test.mailbot.net" {
     t.Fatalf("FAIL: Smtp.Host had an unexpected value")
   }
@@ -244,22 +220,27 @@ func Benchmark_VerifyIdentity_cached(b *testing.B) {
   }
 }
 
-func checkForAttention(SystemRef string, t *testing.T) {
-  // look for absence Attn log messages
-  var attnMsg string
-  rows, err := Conf.DatabaseHandle.Query(
-    "SELECT msg FROM session.log WHERE strpos(msg, $1) > 0 and level = 'Attention'", SystemRef)
+func checkLoggedErrors(SystemRef string, t *testing.T) {
+  // look for absence err log messages
+
+  logf, err := os.Open(LOGFILENAME)
   if err != nil {
-    t.Fatalf("Failed to select log rows for request %s, got err: %s", SystemRef, err)
+    t.Fatalf("Log file %s could not be opened: %s", LOGFILENAME, err)
   }
-  for rows.Next() {
-    if err := rows.Scan(&attnMsg); err != nil {
-      t.Fatalf("Failed to get value from current row: %s", err)
+  defer logf.Close()
+
+  scanner := bufio.NewScanner(logf)
+  for scanner.Scan() {
+    line := scanner.Text()
+    if strings.Contains(line, SystemRef) {
+      if strings.Index(line, "E") == 0 {
+        t.Fatalf("Error found in logfile: %s", line)
+        break
+      }
     }
-    t.Errorf("Attn log msg: %s", attnMsg)
   }
-  if err := rows.Err(); err != nil {
-    t.Fatalf("Error while reading rows: %s", err)
+  if err := scanner.Err(); err != nil {
+    t.Fatalf("Error while reading logfile: %s", err)
   }
 }
 
@@ -407,7 +388,7 @@ func userCaseFactory(index int) *userCase {
       loginUser:      "",
       loginPassword:  "",
       expector: func(auResp *UserResponse, ur *UserDbRow, t *testing.T) {
-        checkForAttention(auResp.ValidationResult.SystemRef, t)
+        checkLoggedErrors(auResp.ValidationResult.SystemRef, t)
         checkValidationResult(t, auResp)
 
         compareStringColumn(t, "sys_user_id", ur.sys_user_id, "**UUID**")
@@ -443,7 +424,7 @@ func userCaseFactory(index int) *userCase {
       loginUser:      "JDoe99",
       loginPassword:  `  \u0009ODd-Pas{}[ ]( )*\\Re\"d/\\s  `,
       expector: func(auResp *UserResponse, ur *UserDbRow, t *testing.T) {
-        checkForAttention(auResp.ValidationResult.SystemRef, t)
+        checkLoggedErrors(auResp.ValidationResult.SystemRef, t)
         checkValidationResult(t, auResp)
 
         compareStringColumn(t, "sys_user_id", ur.sys_user_id, SavedRow.sys_user_id)
@@ -477,7 +458,7 @@ func userCaseFactory(index int) *userCase {
       loginUser:      "JDoe99",
       loginPassword:  `  \u0009ODd-Pas{}[ ]( )*\\Re\"d/\\s  `,
       expector: func(auResp *UserResponse, ur *UserDbRow, t *testing.T) {
-        checkForAttention(auResp.ValidationResult.SystemRef, t)
+        checkLoggedErrors(auResp.ValidationResult.SystemRef, t)
         checkValidationResult(t, auResp)
 
         compareStringColumn(t, "sys_user_id", ur.sys_user_id, SavedRow.sys_user_id)
@@ -514,7 +495,7 @@ func userCaseFactory(index int) *userCase {
       loginUser:      "JDoe99",
       loginPassword:  `  \u0009ODd-Pas{}[ ]( )*\\Re\"d/\\s  `,
       expector: func(auResp *UserResponse, ur *UserDbRow, t *testing.T) {
-        checkForAttention(auResp.ValidationResult.SystemRef, t)
+        checkLoggedErrors(auResp.ValidationResult.SystemRef, t)
         checkValidationResult(t, auResp)
 
         compareStringColumn(t, "sys_user_id", ur.sys_user_id, SavedRow.sys_user_id)
@@ -554,7 +535,7 @@ func userCaseFactory(index int) *userCase {
       loginUser:      "smithyrules!",
       loginPassword:  `  \u0009ODd-Pas{}[ ]( )*\\Re\"d/\\s  `,
       expector: func(auResp *UserResponse, ur *UserDbRow, t *testing.T) {
-        checkForAttention(auResp.ValidationResult.SystemRef, t)
+        checkLoggedErrors(auResp.ValidationResult.SystemRef, t)
         checkValidationResult(t, auResp)
 
         compareStringColumn(t, "sys_user_id", ur.sys_user_id, SavedRow.sys_user_id)
@@ -591,7 +572,7 @@ func userCaseFactory(index int) *userCase {
       loginUser:      "smithyrules!",
       loginPassword:  "Simple Secret99",
       expector: func(auResp *UserResponse, ur *UserDbRow, t *testing.T) {
-        checkForAttention(auResp.ValidationResult.SystemRef, t)
+        checkLoggedErrors(auResp.ValidationResult.SystemRef, t)
         checkBadValidationResult(t, "SysUserId", "Does not match UUID in URL", auResp)
 
         compareStringColumn(t, "sys_user_id", ur.sys_user_id, SavedRow.sys_user_id)
@@ -1066,22 +1047,7 @@ func doLoginCase(cur *loginCase, t *testing.T) {
     }
   }
 
-  logs, err := fetchLog(r.ValidationResult.SystemRef)
-  if err != nil {
-    t.Fatalf("Error while retrieving logs: %s", err)
-  }
-
-  // search the log
-  found := false
-  for x := 0; x < len(logs); x++ {
-    if strings.Index(logs[x], cur.expectLogMsg) > 0 {
-      found = true
-      break
-    }
-  }
-  if !found {
-    t.Fatalf("Logs did not contain \"%s\" in %d log rows", cur.expectLogMsg, len(logs))
-  }
+  mustExistInLog(r.ValidationResult.SystemRef, cur.expectLogMsg, t)
 }
 
 func Test_Login_table(t *testing.T) {
@@ -1126,28 +1092,33 @@ func Test_Login_table(t *testing.T) {
   }
 }
 
-func fetchLog(withPrefix string) (logMessages []string, err error) {
-  // retrieve the log messages
-  logsql := fmt.Sprintf("select msg from session.log where position('%s' in msg) > 0", withPrefix)
-  logMessages = make([]string, 0, 1000)
+// mustExistInLog finds lines in the logfile containing both prefix and expectStr
+// if it is not found the test is failed
+func mustExistInLog(prefix string, expectStr string, t *testing.T) {
 
-  rows, err := Conf.DatabaseHandle.Query(logsql)
+  logf, err := os.Open(LOGFILENAME)
   if err != nil {
-    return logMessages, err
+    t.Fatalf("Log file %s could not be opened: %s", LOGFILENAME, err)
   }
+  defer logf.Close()
 
-  var lm string
-  for rows.Next() {
-    if err := rows.Scan(&lm); err != nil {
-      return logMessages, err
-    } else {
-      logMessages = append(logMessages, lm)
+  found := false
+  scanner := bufio.NewScanner(logf)
+  for scanner.Scan() {
+    line := scanner.Text()
+    if strings.Contains(line, prefix) && strings.Contains(line, expectStr) {
+      found = true
+      break
     }
   }
-  if err := rows.Err(); err != nil {
-    return logMessages, err
+  if err := scanner.Err(); err != nil {
+    t.Fatalf("Error while reading logfile: %s", err)
   }
-  return logMessages, nil
+
+  if !found {
+    t.Fatalf("Failed to find in logfile (%s && &s)", prefix, expectStr)
+  }
+
 }
 
 type logoutCase struct {
@@ -1185,22 +1156,7 @@ func doLogoutCase(cur *logoutCase, t *testing.T) {
     t.Fatalf("Error while decoding response body: %s", err)
   }
 
-  logs, err := fetchLog(r.SystemRef)
-  if err != nil {
-    t.Fatalf("Error while retrieving logs: %s", err)
-  }
-
-  // search the log
-  found := false
-  for x := 0; x < len(logs); x++ {
-    if strings.Index(logs[x], cur.expect) > 0 {
-      found = true
-      break
-    }
-  }
-  if !found {
-    t.Fatalf("Logs did not contain \"%s\" in %d log rows", cur.expect, len(logs))
-  }
+  mustExistInLog(r.SystemRef, cur.expect, t)
 }
 
 func Test_Logout_table(t *testing.T) {
@@ -1265,23 +1221,7 @@ func doResetPassword(t *testing.T, inEmailAddr, expectLogMsg string) {
     t.Fatalf("Error while decoding response body: %s", err)
   }
 
-  logs, err := fetchLog(r.SystemRef)
-  if err != nil {
-    t.Fatalf("Error while retrieving logs: %s", err)
-  }
-
-  // search the log
-  found := false
-  for x := 0; x < len(logs); x++ {
-    if strings.Index(logs[x], expectLogMsg) > 0 {
-      found = true
-      break
-    }
-  }
-  if !found {
-    t.Fatalf("Logs did not contain \"%s\" in %d log rows", expectLogMsg, len(logs))
-  }
-
+  mustExistInLog(r.SystemRef, expectLogMsg, t)
 }
 
 func useResetTokenInEmail(t *testing.T, inEmailAddr, expectLogMsg string) {
@@ -1327,6 +1267,10 @@ func Test_Reset_fail_unknown_address(t *testing.T) {
 }
 
 func Test_Reset_on_already_reset(t *testing.T) {
+
+  if SavedRow == nil {
+    t.Fatal("SavedRow failed to save in previous test")
+  }
 
   doResetPassword(t, SavedRow.email_addr, "Created a reset token for email addess "+SavedRow.email_addr)
 

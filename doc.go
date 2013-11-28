@@ -2,14 +2,11 @@
 
 /*
 Package session provides http handlers for managing users and permitting them to start a session by logging in. It is HTTPS based using JSON objects that are stored in a PostgreSQL database.
-This package assumes that the caller has called logdb.Initialize to initialize the loggers
-
 
 
 
 Refactoring TODO
     Make sure all SQL is done in the model (verifyemail for example)
-    fetchLogs should be moved into package logdb
 
 Next steps TODO
     A doUser test to verify that the cache is correct after profile change

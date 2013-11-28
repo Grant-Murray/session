@@ -28,8 +28,6 @@ CREATE TABLE IF NOT EXISTS session.session (
 );
 
 CREATE TABLE IF NOT EXISTS session.config (
-  max_log_days integer default 7,
-  debug_verbosely boolean default FALSE,
   session_timeout integer,
   session_max_life integer,
   smtp_server_host varchar(256),
@@ -48,12 +46,3 @@ CREATE TABLE IF NOT EXISTS session.config (
 );
 
 INSERT INTO session.config DEFAULT VALUES;
-
-CREATE TABLE IF NOT EXISTS session.log (
-  entered timestamp with time zone,
-  level VARCHAR(16),
-  msg text
-);
-INSERT INTO session.log VALUES (now(), 'Info', 'table created');
-
-

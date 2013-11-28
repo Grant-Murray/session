@@ -5,7 +5,7 @@ import (
   "database/sql"
   "encoding/hex"
   "fmt"
-  "github.com/Grant-Murray/logdb"
+  "github.com/golang/glog"
   "github.com/lib/pq"
   uuid "github.com/nu7hatch/gouuid"
   "strings"
@@ -63,7 +63,7 @@ func encrypt(salt string, clearstr string) (crypt string, err error) {
 
   saltBytes, err := hex.DecodeString(salt)
   if err != nil {
-    logdb.Attn.Printf("Undecodable pw_salt (%s)", salt)
+    glog.Errorf("Undecodable pw_salt (%s)", salt)
     return
   }
 
@@ -73,7 +73,7 @@ func encrypt(salt string, clearstr string) (crypt string, err error) {
 
   cryptBytes, err := scrypt.Key([]byte(clearstr), combined, 65536, 8, 1, 64)
   if err != nil {
-    logdb.Attn.Printf("Failure in execution of scrypt: %s", err)
+    glog.Errorf("Failure in execution of scrypt: %s", err)
   }
   crypt = hex.EncodeToString(cryptBytes)
   return crypt, err
@@ -126,7 +126,7 @@ func SelectUser(UserIdentifier string) (rw *UserDbRow, err error) {
       rw.SetNullables(nullable)
       return rw, err
     } else if err != sql.ErrNoRows {
-      logdb.Attn.Printf("SelectUser failed: %s", err)
+      glog.Errorf("SelectUser failed: %s", err)
       return nil, err
     }
   }
@@ -153,7 +153,7 @@ func SelectUser(UserIdentifier string) (rw *UserDbRow, err error) {
       rw.SetNullables(nullable)
       return rw, err
     } else if err != sql.ErrNoRows {
-      logdb.Attn.Printf("SelectUser failed: %s", err)
+      glog.Errorf("SelectUser failed: %s", err)
       return nil, err
     }
   }
@@ -178,7 +178,7 @@ func SelectUser(UserIdentifier string) (rw *UserDbRow, err error) {
     rw.SetNullables(nullable)
     return rw, err
   } else if err != sql.ErrNoRows {
-    logdb.Attn.Printf("SelectUser failed: %s", err)
+    glog.Errorf("SelectUser failed: %s", err)
     return nil, err
   }
   return
@@ -203,7 +203,7 @@ func (rw *UserDbRow) SetEncryptedPassword(ClearPassword string) (err error) {
   rw.pw_salt = hex.EncodeToString(pwSaltBytes)
 
   if rw.pw_crypt, err = encrypt(rw.pw_salt, ClearPassword); err != nil {
-    logdb.Attn.Printf("Failed to encrypt password: %s", err)
+    glog.Errorf("Failed to encrypt password: %s", err)
     return err
   }
 
@@ -214,7 +214,7 @@ func (rw *UserDbRow) SetEncryptedPassword(ClearPassword string) (err error) {
 func (rw *UserDbRow) MakeSystemUserId() (string, error) {
   u4, err := uuid.NewV4()
   if err != nil {
-    logdb.Attn.Printf("Failed to generate a uuid as sys_user_id: %s", err)
+    glog.Errorf("Failed to generate a uuid as sys_user_id: %s", err)
     return "", err
   }
 
@@ -227,12 +227,14 @@ func (rw *UserDbRow) MakeVerifyToken() error {
   rw.verify_token = ""
   u4, err := uuid.NewV4()
   if err != nil {
-    logdb.Attn.Printf("Failed to generate a uuid as verify_token: %s", err)
+    glog.Errorf("Failed to generate a uuid as verify_token: %s", err)
     return err
   }
 
   rw.verify_token = u4.String()
-  logdb.Debug.Printf("Using %s as verify token for sys_user_id %s", rw.verify_token, rw.sys_user_id)
+  if glog.V(2) {
+    glog.Infof("Using %s as verify token for sys_user_id %s", rw.verify_token, rw.sys_user_id)
+  }
   return nil
 }
 
@@ -245,7 +247,7 @@ func encryptResetToken(clearResetToken string, SysUserId string) (reset_token st
 
   reset_token, err = encrypt(salt, clearResetToken)
   if err != nil {
-    logdb.Attn.Printf("Failed to encrypt reset token: %s", err)
+    glog.Errorf("Failed to encrypt reset token: %s", err)
     return
   }
 
@@ -260,7 +262,7 @@ func (rw *UserDbRow) UpdateResetToken() (clearResetToken string, err error) {
 
   u4, err := uuid.NewV4()
   if err != nil {
-    logdb.Attn.Printf("Failed to generate a uuid as reset_token: %s", err)
+    glog.Errorf("Failed to generate a uuid as reset_token: %s", err)
     return
   }
 
@@ -268,7 +270,7 @@ func (rw *UserDbRow) UpdateResetToken() (clearResetToken string, err error) {
 
   rw.reset_token, err = encryptResetToken(clearResetToken, rw.sys_user_id)
   if err != nil {
-    logdb.Attn.Printf("encryptResetToken failed: %s", err)
+    glog.Errorf("encryptResetToken failed: %s", err)
     return
   }
 
@@ -282,7 +284,7 @@ func (rw *UserDbRow) UpdateResetToken() (clearResetToken string, err error) {
 
   _, err = Conf.DatabaseHandle.Query(updsql, rw.reset_token, rw.reset_expires, rw.sys_user_id)
   if err != nil {
-    logdb.Attn.Printf("Database error updating reset token: %s", err)
+    glog.Errorf("Database error updating reset token: %s", err)
     return "", err
   }
 
@@ -302,11 +304,13 @@ func (rw *UserDbRow) expireResetToken() (err error) {
 
   _, err = Conf.DatabaseHandle.Query(updsql, rw.reset_expires, rw.sys_user_id)
   if err != nil {
-    logdb.Attn.Printf("Database error expiring reset token: %s", err)
+    glog.Errorf("Database error expiring reset token: %s", err)
     return err
   }
 
-  logdb.Debug.Printf("Expired reset token for sys_user_id %s", rw.sys_user_id)
+  if glog.V(2) {
+    glog.Infof("Expired reset token for sys_user_id %s", rw.sys_user_id)
+  }
   return
 
 }
@@ -372,7 +376,7 @@ func (rw *UserDbRow) InsertUser() (err error) {
     rw.tz_name)
 
   if err != nil {
-    logdb.Attn.Printf("Database error inserting user: %s", err)
+    glog.Errorf("Database error inserting user: %s", err)
     return
   }
 
@@ -414,7 +418,7 @@ func (rw *UserDbRow) UpdateUser() (err error) {
     rw.sys_user_id)
 
   if err != nil {
-    logdb.Attn.Printf("Database error updating user: %s", err)
+    glog.Errorf("Database error updating user: %s", err)
     return
   }
 

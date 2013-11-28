@@ -1,6 +1,4 @@
 UPDATE session.config SET 
-max_log_days = 5,
-debug_verbosely = TRUE,
 session_timeout = 60*5, /* 5 minutes */
 session_max_life = 18*60*60, /* 18 hours */
 reset_timeout = 4*60*60, /* 4 hours */
