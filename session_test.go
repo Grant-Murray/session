@@ -3,7 +3,6 @@
 In order to run these tests, a running sessiond is required as well as a configured mail server (cf. mailbot)
 This server key used in these tests needs to match the one used in the running sessiond (see TestSetup for where it is set)
 
-
 */
 package session
 
@@ -32,6 +31,7 @@ var (
   SavedIpAddress     string = "10.10.10.6" // TODO should do a DNS lookup of Conf.HttpsHost for this
   SavedUserAgent     string = "Agent007-Tester"
   SavedCookieJar     http.CookieJar
+  SavedCookieMap     map[string]*http.Cookie // built after calling SavedCookieJar.Cookies(url)
 )
 
 const (
@@ -104,6 +104,7 @@ func doTestUser(t *testing.T, SysUserId string, body string) (auResp *UserRespon
     t.Fatalf("client request failed: %s", err)
     return auResp, err
   }
+  defer resp.Body.Close()
 
   dec := json.NewDecoder(resp.Body)
 
@@ -111,7 +112,6 @@ func doTestUser(t *testing.T, SysUserId string, body string) (auResp *UserRespon
   if err != nil {
     t.Fatalf("Error while decoding response body: %s", err)
   }
-  resp.Body.Close()
 
   return auResp, err
 }
@@ -149,6 +149,16 @@ func Benchmark_Add_User(b *testing.B) {
     }
 
     resp.Body.Close()
+  }
+
+}
+
+// utility test to set email_verified=T for the users created above
+func Benchmark_email_verification(b *testing.B) {
+
+  _, err := Conf.DatabaseHandle.Exec("update session.user set email_verified = true")
+  if err != nil {
+    b.Fatalf("Failed to updated email_verified: %s", err)
   }
 
 }
@@ -331,10 +341,14 @@ func verifyEmailTest(em string, tok string, t *testing.T) (vr *VerifyResponse, e
   return vr, err
 }
 
-func resetEmailTest(url string, t *testing.T) (lr *LoginResponse, err error) {
+func resetEmailTest(em, tok string, t *testing.T) (lr *LoginResponse, err error) {
   client := initClient()
+  client.Jar = SavedCookieJar
 
-  req, err := http.NewRequest("GET", url, nil)
+  addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
+  urlStr := fmt.Sprintf("https://%s/session/reset/%s/token/%s", addr, em, tok)
+
+  req, err := http.NewRequest("GET", urlStr, nil)
   if err != nil {
     t.Fatalf("Failed to create a request: %s", err)
     return lr, err
@@ -345,6 +359,19 @@ func resetEmailTest(url string, t *testing.T) (lr *LoginResponse, err error) {
   if err != nil {
     t.Fatalf("client request failed: %s", err)
     return lr, err
+  }
+  defer resp.Body.Close()
+
+  // load SavedCookieMap
+  u, err := url.Parse(fmt.Sprintf("https://%s/", addr))
+  if err != nil {
+    t.Fatalf("Could not parse url: %s", err)
+  }
+
+  cookies := SavedCookieJar.Cookies(u)
+  SavedCookieMap = make(map[string]*http.Cookie)
+  for _, c := range cookies {
+    SavedCookieMap[c.Name] = c
   }
 
   dec := json.NewDecoder(resp.Body)
@@ -831,6 +858,25 @@ type verificationCase struct {
   Expected  Result
 }
 
+func expectResult(expect, actual Result, t *testing.T) {
+
+  if actual.Status != expect.Status {
+    t.Errorf("Result.Status: expected %s, actual %s", expect.Status, actual.Status)
+  }
+
+  if actual.Message != expect.Message {
+    t.Errorf("Result.Message: expected %s, actual %s", expect.Message, actual.Message)
+  }
+
+  if actual.PropInError != expect.PropInError {
+    t.Errorf("Result.PropInError expected %s, actual %s", expect.PropInError, actual.PropInError)
+  }
+
+  if actual.PropErrorMsg != expect.PropErrorMsg {
+    t.Errorf("Result.PropErrorMsg expected %s, actual %s", expect.PropErrorMsg, actual.PropErrorMsg)
+  }
+}
+
 func Test_EmailAddr_Verification_Failures(t *testing.T) {
 
   const typicalMessage = "Verification failed"
@@ -849,21 +895,7 @@ func Test_EmailAddr_Verification_Failures(t *testing.T) {
       t.Fatalf("Unexpected error while verifying: %s", err)
     }
 
-    if vr.ValidationResult.Status != cur.Expected.Status {
-      t.Errorf("Expected status=%s but got=%s", cur.Expected.Status, vr.ValidationResult.Status)
-    }
-
-    if vr.ValidationResult.Message != cur.Expected.Message {
-      t.Errorf("Expected status=%s but got=%s", cur.Expected.Message, vr.ValidationResult.Message)
-    }
-
-    if vr.ValidationResult.PropInError != cur.Expected.PropInError {
-      t.Errorf("Expected status=%s but got=%s", cur.Expected.PropInError, vr.ValidationResult.PropInError)
-    }
-
-    if vr.ValidationResult.PropErrorMsg != cur.Expected.PropErrorMsg {
-      t.Errorf("Expected status=%s but got=%s", cur.Expected.PropErrorMsg, vr.ValidationResult.PropErrorMsg)
-    }
+    expectResult(cur.Expected, vr.ValidationResult, t)
   }
 }
 
@@ -1224,49 +1256,81 @@ func doResetPassword(t *testing.T, inEmailAddr, expectLogMsg string) {
   mustExistInLog(r.SystemRef, expectLogMsg, t)
 }
 
-func useResetTokenInEmail(t *testing.T, inEmailAddr, expectLogMsg string) {
+func useResetTokenInEmail(t *testing.T, inEmailAddr string) *LoginResponse {
   // get the token from the email and use it
   bod, err := getEmail(inEmailAddr)
   if err != nil {
     t.Fatalf("getEmail returned an error: %s", err)
   }
 
-  // parse out the url
-  ridx := strings.Index(bod, "/reset/")
-  uidx := ridx - 40 // url begins a little before ridx
-  if uidx < 0 {
-    t.Fatalf("Unexpected failure looking for URL")
-  }
-
-  a1 := bod[uidx:]                        // now can search for "http"
-  s1 := a1[strings.Index(a1, "http://"):] // s1: starts at url
-  ResetURL := s1[:strings.Index(s1, "\n")]
+  // parse out the link to get email address and token
+  s1 := bod[strings.Index(bod, "reset/")+6:] // s1 starts at email address
+  EmailAddr := s1[:strings.Index(s1, "/")]
+  s2 := bod[strings.Index(bod, "token/")+6:] // s2 starts at the token value
+  ResetToken := s2[:strings.Index(s2, "\n")]
 
   // Use the token by getting the link
-  lr, err := resetEmailTest(ResetURL, t)
+  lr, err := resetEmailTest(EmailAddr, ResetToken, t)
   if err != nil {
     t.Fatalf("Unexpected error while resetting: %s", err)
   }
 
-  // TODO check the cookies
+  return lr
+}
 
-  if lr.ValidationResult.Status != StatusOK {
-    t.Errorf("Expected OK status after verification but got=%s", lr.ValidationResult.Status)
+// tests url /session/reset/  (i.e. blank email address)
+func Test_doReset_blank_email_address(t *testing.T) {
+
+  client := initClient()
+  addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
+  req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/session/reset/", addr), nil)
+  req.Header.Set("User-Agent", SavedUserAgent)
+  if err != nil {
+    t.Fatalf("Failed to create a request: %s", err)
+  }
+
+  resp, err := client.Do(req)
+  if err != nil {
+    t.Fatalf("client request failed: %s", err)
+  }
+
+  if resp.StatusCode != http.StatusNotFound {
+    t.Fatalf("HTTP status: expected %s, actual %d", http.StatusNotFound, resp.StatusCode)
   }
 }
 
-func Test_Reset_fail_bad_address(t *testing.T) {
+// tests url /session/reset/{em}/token/ (i.e. blank token)
+func Test_useReset_blank_token(t *testing.T) {
 
-  // Reset email address does not match the email pattern
+  client := initClient()
+  addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
+  req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/session/reset/someone@somewhere.net/token/", addr), nil)
+  req.Header.Set("User-Agent", SavedUserAgent)
+  if err != nil {
+    t.Fatalf("Failed to create a request: %s", err)
+  }
+
+  resp, err := client.Do(req)
+  if err != nil {
+    t.Fatalf("client request failed: %s", err)
+  }
+
+  if resp.StatusCode != http.StatusNotFound {
+    t.Fatalf("HTTP status: expected %s, actual %d", http.StatusNotFound, resp.StatusCode)
+  }
+}
+
+// Reset email address does not match the email pattern
+func Test_doReset_fail_bad_address(t *testing.T) {
   doResetPassword(t, "bad-address", "Password reset for bad-address failed, bad email address")
 }
 
-func Test_Reset_fail_unknown_address(t *testing.T) {
-  // Email address is not in database
+// Email address is not in database
+func Test_doReset_fail_unknown_address(t *testing.T) {
   doResetPassword(t, "notfound@here.com", "SelectUser err: sql: no rows in result set")
 }
 
-func Test_Reset_on_already_reset(t *testing.T) {
+func Test_doReset_on_already_reset(t *testing.T) {
 
   if SavedRow == nil {
     t.Fatal("SavedRow failed to save in previous test")
@@ -1286,8 +1350,10 @@ func Test_Reset_on_already_reset(t *testing.T) {
   doResetPassword(t, SavedRow.email_addr, "Active reset token already exists for "+SavedRow.email_addr)
 }
 
-func Test_Reset_on_expired_reset(t *testing.T) {
-  // Assert: have a user (SavedRow) who has requested a password reset, need to force the expiration
+func Test_doReset_on_expired_reset(t *testing.T) {
+  // Assert: have a user (SavedRow) who has requested a password reset from previous test
+
+  // force the expiration of the token
   err := SavedRow.expireResetToken()
   if err != nil {
     t.Fatalf("expireResetToken returned with error: %s", err)
@@ -1295,7 +1361,7 @@ func Test_Reset_on_expired_reset(t *testing.T) {
 
   oldResetToken := SavedRow.reset_token
 
-  // get the email to clear all of it
+  // get the email to clear all emails
   _, err = getEmail(SavedRow.email_addr)
   if err != nil {
     t.Fatalf("getEmail returned an error: %s", err)
@@ -1313,7 +1379,132 @@ func Test_Reset_on_expired_reset(t *testing.T) {
   if oldResetToken == SavedRow.reset_token {
     t.Fatalf("Expected a fresh reset token, but got the expired one")
   }
+}
+
+func Test_useReset_success(t *testing.T) {
+  lr := useResetTokenInEmail(t, SavedRow.email_addr)
+
+  tok := SavedCookieMap["SessionToken"].Value
+  salt := SavedCookieMap["Salt"].Value
+
+  if len(tok) != 36 {
+    t.Fatalf("Expected SessionToken length 36, actual %d", len(tok))
+  }
+
+  if len(salt) != 64 {
+    t.Fatalf("Expected Salt length 64, actual %d", len(salt))
+  }
+
+  sess, err := SelectValidSession(&ClearSessionId{tok, salt})
+  if err != nil {
+    t.Fatalf("SelectValidSession returned error: %s", err)
+  }
+  t.Logf("SessionToken=%s\n  expires: %s\n  started: %s", tok, sess.expires_dt, sess.start_dt)
+
+  if len(SavedCookieMap["SysUserId"].Value) != 36 {
+    t.Fatalf("Expected SysUserId length 36, actual %d", len(SavedCookieMap["SysUserId"].Value))
+  }
+
+  if lr.ValidationResult.Status != StatusOK {
+    t.Errorf("Expected OK status after verification but got=%s", lr.ValidationResult.Status)
+  }
+
+  expectResult(Result{Status: StatusOK, Message: "Reset request is valid", PropInError: "", PropErrorMsg: ""}, lr.ValidationResult, t)
+  mustExistInLog(lr.ValidationResult.SystemRef, fmt.Sprintf("Reset request is valid for email %s", SavedRow.email_addr), t)
+
+  // check fields updated: reset_token, email_verified, verify_token
+  ur, err := SelectUser(SavedRow.email_addr)
+  if err != nil {
+    t.Fatalf("SelectUser returned with error: %s", err)
+  }
+  SavedRow = ur // update the SavedRow
+
+  if SavedRow.reset_token != "" {
+    t.Fatal("Expected reset_token to be blank")
+  }
+
+  if SavedRow.verify_token != "" {
+    t.Fatal("Expected verify_token to be blank")
+  }
+
+  if !SavedRow.email_verified {
+    t.Fatal("Expected email_verified to be true")
+  }
+}
+
+func Test_useReset_token_is_not_UUID(t *testing.T) {
+
+  lr, err := resetEmailTest(SavedRow.email_addr, "not_real_token", t)
+  if err != nil {
+    t.Fatalf("Unexpected error while resetting: %s", err)
+  }
+
+  expectResult(Result{Status: StatusInvalid, Message: "Reset failed", PropInError: "ResetToken", PropErrorMsg: "Not a valid reset token"}, lr.ValidationResult, t)
 
 }
 
-// Reset token using tests.
+func Test_useReset_token_is_not_in_db(t *testing.T) {
+
+  lr, err := resetEmailTest(SavedRow.email_addr, "4acc6c82-667c-4e4b-6a52-d5dfdc188007", t)
+  if err != nil {
+    t.Fatalf("Unexpected error while resetting: %s", err)
+  }
+
+  expectResult(Result{Status: StatusInvalid, Message: "Reset failed", PropInError: "", PropErrorMsg: ""}, lr.ValidationResult, t)
+  mustExistInLog(lr.ValidationResult.SystemRef, "No reset token in database", t)
+
+}
+
+func Test_useReset_on_expired_reset(t *testing.T) {
+  doResetPassword(t, SavedRow.email_addr, "Created a reset token for email addess "+SavedRow.email_addr)
+
+  // force the expiration of the token
+  err := SavedRow.expireResetToken()
+  if err != nil {
+    t.Fatalf("expireResetToken returned with error: %s", err)
+  }
+
+  lr := useResetTokenInEmail(t, SavedRow.email_addr)
+
+  expectResult(Result{Status: StatusInvalid, Message: "Reset failed", PropInError: "", PropErrorMsg: ""}, lr.ValidationResult, t)
+  mustExistInLog(lr.ValidationResult.SystemRef, "Reset token is expired", t)
+}
+
+func Test_doReset_login_disallowed(t *testing.T) {
+  err := SavedRow.setLoginAllowed(false)
+  if err != nil {
+    t.Fatalf("setLoginAllowed returned with error: %s", err)
+  }
+
+  doResetPassword(t, SavedRow.email_addr, "login_allowed is false")
+
+  err = SavedRow.setLoginAllowed(true)
+  if err != nil {
+    t.Fatalf("setLoginAllowed returned with error: %s", err)
+  }
+}
+
+func Test_useReset_login_disallowed(t *testing.T) {
+  // login_allowed should already be true, but make sure
+  err := SavedRow.setLoginAllowed(true)
+  if err != nil {
+    t.Fatalf("setLoginAllowed returned with error: %s", err)
+  }
+
+  doResetPassword(t, SavedRow.email_addr, "Created a reset token for email addess "+SavedRow.email_addr)
+
+  err = SavedRow.setLoginAllowed(false)
+  if err != nil {
+    t.Fatalf("setLoginAllowed returned with error: %s", err)
+  }
+
+  lr := useResetTokenInEmail(t, SavedRow.email_addr)
+
+  expectResult(Result{Status: StatusInvalid, Message: "Reset failed", PropInError: "", PropErrorMsg: ""}, lr.ValidationResult, t)
+  mustExistInLog(lr.ValidationResult.SystemRef, "login_allowed is false", t)
+
+  err = SavedRow.setLoginAllowed(true)
+  if err != nil {
+    t.Fatalf("setLoginAllowed returned with error: %s", err)
+  }
+}

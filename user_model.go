@@ -292,6 +292,24 @@ func (rw *UserDbRow) UpdateResetToken() (clearResetToken string, err error) {
 
 }
 
+// setLoginAllowed sets the value of login_allowed, this is only used in testing
+func (rw *UserDbRow) setLoginAllowed(val bool) (err error) {
+
+  updsql := fmt.Sprintf("UPDATE session.user SET login_allowed = %t WHERE sys_user_id = $1", val)
+
+  _, err = Conf.DatabaseHandle.Query(updsql, rw.sys_user_id)
+  if err != nil {
+    glog.Errorf("Database error setting login_allowed: %s", err)
+    return err
+  }
+
+  if glog.V(2) {
+    glog.Infof("setLoginAllowed called successfully (set to %t) for sys_user_id %s", val, rw.sys_user_id)
+  }
+  return
+
+}
+
 // expireResetToken expires the password reset token, this is only used in testing
 func (rw *UserDbRow) expireResetToken() (err error) {
 
@@ -319,9 +337,10 @@ func (rw *UserDbRow) expireResetToken() (err error) {
 func (rw *UserDbRow) RemoveResetToken() (err error) {
 
   const sql = `UPDATE session.user SET
-    reset_token = null,
-    reset_expires = null,
-    email_verified = true 
+    reset_token = NULL,
+    reset_expires = NULL,
+    email_verified = true,
+    verify_token = NULL
     WHERE sys_user_id = $1`
 
   result, err := Conf.DatabaseHandle.Exec(sql, rw.sys_user_id)

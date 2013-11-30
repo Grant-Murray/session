@@ -676,6 +676,17 @@ func DefaultLoginResponse(localPrefix string) (resp *LoginResponse) {
   return resp
 }
 
+func (loginResp *LoginResponse) setUserData(userRow UserDbRow) {
+  loginResp.SessionTTL = Conf.SessionTimeout
+  loginResp.SysUserId = userRow.sys_user_id
+  loginResp.EmailAddr = userRow.email_addr
+  loginResp.EmailVerified = userRow.email_verified
+  loginResp.UserId = userRow.user_id
+  loginResp.FirstName = userRow.first_name
+  loginResp.LastName = userRow.last_name
+  loginResp.TzName = userRow.tz_name
+}
+
 // genericLogin is called as a web service (doLogin) and as a package func (Verify)
 func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginRequest, loginResp *LoginResponse) {
 
@@ -695,7 +706,7 @@ func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginReques
     return
   }
 
-  // there are 2 ways to login with a ClearPassword or a SessionToken+Salt
+  // there are 2 ways for UserIdentifier to login: 1)ClearPassword or 2)SessionToken+Salt
   var loginUsingPassword = true
 
   if loginReq.ClearPassword == "" && loginReq.SessionToken == "" {
@@ -822,14 +833,8 @@ func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginReques
     }
   }
 
-  loginResp.SessionTTL = Conf.SessionTimeout
-  loginResp.SysUserId = userRow.sys_user_id
-  loginResp.EmailAddr = userRow.email_addr
-  loginResp.EmailVerified = userRow.email_verified
-  loginResp.UserId = userRow.user_id
-  loginResp.FirstName = userRow.first_name
-  loginResp.LastName = userRow.last_name
-  loginResp.TzName = userRow.tz_name
+  loginResp.setUserData(*userRow)
+
   loginResp.ValidationResult.Message = "Authentication successful"
   loginResp.ValidationResult.Status = StatusOK
 
@@ -928,6 +933,27 @@ func VerifyIdentity(logTag, userId string, sess ClearSessionId, ipAddress, userA
   return resp
 }
 
+func setSessionCookies(rw http.ResponseWriter, loginResp *LoginResponse) {
+  http.SetCookie(rw, &http.Cookie{
+    Name:    "SessionToken",
+    Secure:  true,
+    Path:    "/",
+    Value:   loginResp.SessionToken,
+    Expires: time.Now().Add(time.Duration(loginResp.SessionTTL) * time.Second)})
+  http.SetCookie(rw, &http.Cookie{
+    Name:    "Salt",
+    Secure:  true,
+    Path:    "/",
+    Value:   loginResp.Salt,
+    Expires: time.Now().Add(time.Duration(loginResp.SessionTTL) * time.Second)})
+  http.SetCookie(rw, &http.Cookie{
+    Name:    "SysUserId",
+    Secure:  true,
+    Path:    "/",
+    Value:   loginResp.SysUserId,
+    Expires: time.Now().Add(time.Duration(loginResp.SessionTTL) * time.Second)})
+}
+
 func doLogin(rw http.ResponseWriter, req *http.Request) {
   localPrefix := fmt.Sprintf("doLogin-%s:", context.Get(req, RequestLogIdKey))
   if glog.V(2) {
@@ -940,26 +966,9 @@ func doLogin(rw http.ResponseWriter, req *http.Request) {
 
   defer func() {
     // encode response to json and write the response
+    setSessionCookies(rw, loginResp)
     enc := json.NewEncoder(rw)
     rw.Header().Add("Content-Type", "application/json")
-    http.SetCookie(rw, &http.Cookie{
-      Name:    "SessionToken",
-      Secure:  true,
-      Path:    "/",
-      Value:   loginResp.SessionToken,
-      Expires: time.Now().Add(time.Duration(loginResp.SessionTTL) * time.Second)})
-    http.SetCookie(rw, &http.Cookie{
-      Name:    "Salt",
-      Secure:  true,
-      Path:    "/",
-      Value:   loginResp.Salt,
-      Expires: time.Now().Add(time.Duration(loginResp.SessionTTL) * time.Second)})
-    http.SetCookie(rw, &http.Cookie{
-      Name:    "SysUserId",
-      Secure:  true,
-      Path:    "/",
-      Value:   loginResp.SysUserId,
-      Expires: time.Now().Add(time.Duration(loginResp.SessionTTL) * time.Second)})
     err = enc.Encode(loginResp)
     if err != nil {
       glog.Errorf("%s Failed to encode response into json", localPrefix)
@@ -1025,6 +1034,14 @@ func getResetToken(rw http.ResponseWriter, req *http.Request) {
     return
   }
 
+  // Check if login allowed
+  if !userRow.login_allowed {
+    if glog.V(2) {
+      glog.Infof("%s login_allowed is false", localPrefix)
+    }
+    return
+  }
+
   // check if sufficient time has passed
   if len(userRow.reset_token) > 1 && userRow.reset_expires.After(time.Now()) {
     if glog.V(2) {
@@ -1074,6 +1091,7 @@ func useResetToken(rw http.ResponseWriter, req *http.Request) {
 
   defer func() {
     // encode response to json and write the response
+    setSessionCookies(rw, response)
     enc := json.NewEncoder(rw)
     rw.Header().Add("Content-Type", "application/json")
     err = enc.Encode(response)
@@ -1111,18 +1129,36 @@ func useResetToken(rw http.ResponseWriter, req *http.Request) {
     return
   }
 
+  // token in db must be there (obviously)
+  if userRow.reset_token == "" {
+    if glog.V(2) {
+      glog.Infof("%s No reset token in database", localPrefix)
+    }
+    return
+  }
+
+  // token must be active not expired (if reset_token is not blank then reset_expires should
+  //   be a valid timestamp, so no need to check that)
+  if userRow.reset_expires.Before(time.Now()) {
+    if glog.V(2) {
+      glog.Infof("%s Reset token is expired", localPrefix)
+    }
+    return
+  }
+
+  // Check if login allowed
+  if !userRow.login_allowed {
+    if glog.V(2) {
+      glog.Infof("%s login_allowed is false", localPrefix)
+    }
+    return
+  }
+
   // tokens must match
   cryptToken, err := encryptResetToken(inResetToken, userRow.sys_user_id)
   if err != nil {
     if glog.V(2) {
       glog.Infof("%s encryptResetToken err: %s", localPrefix, err)
-    }
-    return
-  }
-
-  if userRow.reset_token == "" {
-    if glog.V(2) {
-      glog.Infof("%s No token in database", localPrefix)
     }
     return
   }
@@ -1134,14 +1170,6 @@ func useResetToken(rw http.ResponseWriter, req *http.Request) {
     return
   }
 
-  // token must be active not expired
-  if userRow.reset_expires.Before(time.Now()) {
-    if glog.V(2) {
-      glog.Infof("%s Reset token is expired", localPrefix)
-    }
-    return
-  }
-
   if err = userRow.RemoveResetToken(); err != nil {
     if glog.V(2) {
       glog.Infof("%s RemoveResetToken err: %s", localPrefix, err)
@@ -1149,8 +1177,31 @@ func useResetToken(rw http.ResponseWriter, req *http.Request) {
     return
   }
 
-  // TODO return the correct cookies
+  // according to doc req.RemoteAddr has no defined format. we assume the first part to : is IP addr
+  suppliedIP := req.RemoteAddr[:strings.Index(req.RemoteAddr, ":")]
 
+  // Create a new session
+  var sr = new(SessionDbRow)
+  sr.sys_user_id = userRow.sys_user_id
+  sr.ip_addr = suppliedIP
+  sr.user_agent = req.Header.Get("User-Agent")
+  csi, err := sr.InsertSession()
+  if err != nil {
+    response.ValidationResult.Message = "System error prevented session token creation"
+    return
+  }
+
+  response.SessionToken = csi.SessionToken
+  response.Salt = csi.Salt
+
+  response.setUserData(*userRow)
+
+  response.ValidationResult.Message = "Reset request is valid"
+  response.ValidationResult.Status = StatusOK
+
+  if glog.V(1) {
+    glog.Infof("%s Reset request is valid for email %s (SysUserId %s)", localPrefix, inEmailAddr, response.SysUserId)
+  }
 }
 
 type LogoutRequest struct {
@@ -1231,6 +1282,7 @@ func getLogin(rw http.ResponseWriter, req *http.Request) {
   }
 }
 
+// checkCredentials
 func checkCredentials(req *http.Request) {
 
   logTag := context.Get(req, RequestLogIdKey)
