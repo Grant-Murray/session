@@ -6,6 +6,7 @@ TYP='test'
 # ensure a clean slate
 sudo rm -f /tmp/mailbot.boxes/*
 sudo rm -f /tmp/sessdb.*
+sudo rm -f /tmp/session.test*
 
 # install 
 go clean
