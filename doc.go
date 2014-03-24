@@ -3,17 +3,12 @@
 /*
 Package session provides http handlers for managing users and permitting them to start a session by logging in. It is HTTPS based using JSON objects that are stored in a PostgreSQL database.
 
-
-
-Refactoring TODO
-    Make sure all SQL is done in the model (verifyemail for example)
-
 Next steps TODO
     A doUser test to verify that the cache is correct after profile change
+    UI test when nginx is up, but sessiond is down
+    Should each service have its own postgres role? Instead of using postgres as the role. This role should have a minimal set of privileges.
 
 Must have features
-    password reset - request which sends an email with token, limit to 1 per day
-    password reset - use token to set new password
     domain[3]
 
 Other features

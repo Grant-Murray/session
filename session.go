@@ -24,13 +24,14 @@ import (
 const (
   StatusOK      = "OK"
   StatusInvalid = "Invalid"
+  emailRegex    = `[^@]+?@.{2,128}\.[a-z]{2,44}`
+)
 
-  // context keys
-  RequestLogIdKey   = 0
-  CredentialsKey    = 1
-  CurrentSessionKey = 2
-
-  emailRegex = `[^@]+?@.{2,128}\.[a-z]{2,44}`
+// context keys
+const (
+  RequestLogIdKey = iota
+  CredentialsKey
+  CurrentSessionKey
 )
 
 // All responses are sent with the JSON encoding of an instance of type Result. The possible values for Status are held in constants StatusOK, StatusInvalid, for example:
@@ -51,7 +52,7 @@ type Result struct {
   PropErrorMsg string // error message related to the PropInError
 }
 
-/* Type UserRequest is the type used for initially creating a user and for updating an existing user. For example:
+/* Type UserRequest is the type used for initially creating a user and for updating an existing user. The field SysUserId is blank for insert otherwise it contains the system id assigned when inserted. For example:
 
    {
      "EmailAddr": "JaneDoe@Example.Org",

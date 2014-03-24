@@ -28,7 +28,7 @@ var (
   SavedClearPassword string
   SavedSessionToken  string
   SavedSessionSalt   string
-  SavedIpAddress     string = "10.10.10.6" // TODO should do a DNS lookup of Conf.HttpsHost for this
+  SavedIpAddress     string = "10.10.10.2" // TODO should do a DNS lookup of Conf.HttpsHost for this
   SavedUserAgent     string = "Agent007-Tester"
   SavedCookieJar     http.CookieJar
   SavedCookieMap     map[string]*http.Cookie // built after calling SavedCookieJar.Cookies(url)
