@@ -123,7 +123,7 @@ func init() {
   if err != nil {
     panic(err)
   }
-  rows, err := Conf.DatabaseHandle.Query("SELECT session_timeout, session_max_life, https_key, https_cert, https_host, https_port, smtp_server_host, smtp_server_port, smtp_from, smtp_auth_username, smtp_auth_password, verify_template, reset_template, reset_timeout FROM session.config")
+  rows, err := Conf.DatabaseHandle.Query("SELECT SessionTimeout, SessionMaxLife, HttpsKey, HttpsCert, HttpsHost, HttpsPort, SmtpServerHost, SmtpServerPort, SmtpFrom, SmtpAuthUsername, SmtpAuthPassword, VerifyTemplate, ResetTemplate, PasswordResetExpiresDuration FROM session.config")
   if err != nil {
     panic(err)
   }

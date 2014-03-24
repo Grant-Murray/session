@@ -1,14 +1,14 @@
 UPDATE session.config SET 
-session_timeout = 60*5, /* 5 minutes */
-session_max_life = 18*60*60, /* 18 hours */
-reset_timeout = 4*60*60, /* 4 hours */
-smtp_server_host = 'test.mailbot.net',
-smtp_server_port = 26,
-smtp_from = 'no-reply@mailbot.net',
-smtp_auth_username = 'no-reply@mailbot.net',
-smtp_auth_password = 'zFbfrrRUNBdxBHaaJCNh8X',
+SessionTimeout = 60*5, /* 5 minutes */
+SessionMaxLife = 18*60*60, /* 18 hours */
+PasswordResetExpiresDuration = 4*60*60, /* 4 hours */
+SmtpServerHost = 'test.mailbot.net',
+SmtpServerPort = 26,
+SmtpFrom = 'no-reply@mailbot.net',
+SmtpAuthUsername = 'no-reply@mailbot.net',
+SmtpAuthPassword = 'zFbfrrRUNBdxBHaaJCNh8X',
 
-reset_template = 
+ResetTemplate = 
 'To: {{.FirstName}} {{.LastName}}<{{.EmailAddr}}>
 From: Plog Admin NO REPLY<no-reply@mailbot.net>
 Subject: [ZM Plog] Password Reset
@@ -28,7 +28,7 @@ then just delete this email.
 Regards, Grant
 btw Do not reply to this email address, use my regular one.',
 
-verify_template = 
+VerifyTemplate = 
 'To: {{.FirstName}} {{.LastName}}<{{.EmailAddr}}>
 From: Plog Admin NO REPLY<no-reply@mailbot.net>
 Subject: [ZM Plog] Email Address Verification
@@ -46,9 +46,9 @@ If you did not register on the plog, then just delete this email.
 Regards, Grant
 btw Do not reply to this email address, use my regular one.',
 
-https_host = 'plog.org', /* needs to be in /etc/hosts */
-https_port = '10443',
-https_key = '-----BEGIN PRIVATE KEY-----
+HttpsHost = 'plog.org', /* needs to be in /etc/hosts */
+HttpsPort = '10443',
+HttpsKey = '-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDV6C4tnQLfrolm
 azcdSiGCWGiwtVc+gIoT6gsFPIK+oFdLMHUIFAGhoqMiP5TRHiIJGsW8aUwGpP62
 +OBNtHlhbOgzxPavqDr3b4kAF9hCXQt1lT8NnFOmmpGk1vueqsZSsZkJdCUg1CnV
@@ -76,7 +76,7 @@ zfNGzlNCASv6tTbrtCqMva9tc1lSBkMNP6SpK1O6Sm1hXNzOu1urI4HPR8Du3218
 mlIl4ymFTzIf4xU/u2MLFgt/6pTOKB6mM2sWVhVeOiaSguZYuamuNskvu41eJWVS
 eyqrEtky5MIoSpwchlIwVuw=
 -----END PRIVATE KEY-----',
-  https_cert = '-----BEGIN CERTIFICATE-----
+  HttpsCert = '-----BEGIN CERTIFICATE-----
 MIIDTzCCArigAwIBAgIBAjANBgkqhkiG9w0BAQUFADBsMQswCQYDVQQGEwJVUzET
 MBEGA1UECAwKQ2FsaWZvcm5pYTERMA8GA1UECgwIR0xNIFRlc3QxDzANBgNVBAMM
 BkdMTSBDQTEkMCIGCSqGSIb3DQEJARYVZW1haWxAZ3JhbnRtdXJyYXkuY29tMB4X

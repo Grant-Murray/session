@@ -28,21 +28,21 @@ CREATE TABLE IF NOT EXISTS session.session (
 );
 
 CREATE TABLE IF NOT EXISTS session.config (
-  session_timeout integer,
-  session_max_life integer,
-  smtp_server_host varchar(256),
-  smtp_server_port integer,
-  smtp_from varchar(256),
-  smtp_auth_username varchar(256),
-  smtp_auth_password varchar(256),
-  smtp_auth_host varchar(256),
-  https_host varchar(256),
-  https_port integer,
-  https_key text,
-  https_cert text,
-  verify_template text,
-  reset_template text,
-  reset_timeout integer
+  SessionTimeout integer,
+  SessionMaxLife integer,
+  SmtpServerHost varchar(256),
+  SmtpServerPort integer,
+  SmtpFrom varchar(256),
+  SmtpAuthUsername varchar(256),
+  SmtpAuthPassword varchar(256),
+  SmtpAuthHost varchar(256),
+  HttpsHost varchar(256),
+  HttpsPort integer,
+  HttpsKey text,
+  HttpsCert text,
+  VerifyTemplate text,
+  ResetTemplate text,
+  PasswordResetExpiresDuration integer
 );
 
 INSERT INTO session.config DEFAULT VALUES;
