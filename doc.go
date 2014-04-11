@@ -4,6 +4,7 @@
 Package session provides http handlers for managing users and permitting them to start a session by logging in. It is HTTPS based using JSON objects that are stored in a PostgreSQL database.
 
 Next steps TODO
+    Change table to have: EmailAddr and UnverifiedEmailAddr
     A doUser test to verify that the cache is correct after profile change
     UI test when nginx is up, but sessiond is down
     Should each service have its own postgres role? Instead of using postgres as the role. This role should have a minimal set of privileges.

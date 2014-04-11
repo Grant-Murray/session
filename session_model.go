@@ -9,12 +9,12 @@ import (
 )
 
 type SessionDbRow struct {
-  session_id  string
-  sys_user_id string
-  start_dt    time.Time
-  expires_dt  time.Time
-  ip_addr     string
-  user_agent  string
+  SessionId  string
+  SysUserId  string
+  start_dt   time.Time
+  expires_dt time.Time
+  IpAddr     string
+  UserAgent  string
 }
 
 type ClearSessionId struct {
@@ -22,7 +22,7 @@ type ClearSessionId struct {
   Salt         string
 }
 
-func (csi *ClearSessionId) EncryptToken() (session_id string, err error) {
+func (csi *ClearSessionId) EncryptToken() (SessionId string, err error) {
   // validate the session token by parsing it
   _, err = uuid.ParseHex(csi.SessionToken)
   if err != nil {
@@ -40,14 +40,14 @@ func (csi *ClearSessionId) EncryptToken() (session_id string, err error) {
     return "", err
   }
 
-  session_id, err = encrypt(csi.Salt, csi.SessionToken)
+  SessionId, err = encrypt(csi.Salt, csi.SessionToken)
   if err != nil {
     glog.Errorf("Encryption failed: %s", err)
     err = fmt.Errorf("Encryption failed: %s", err)
     return "", err
   }
 
-  return session_id, nil
+  return SessionId, nil
 }
 
 func SelectValidSession(csi *ClearSessionId) (sess *SessionDbRow, err error) {
@@ -73,20 +73,20 @@ func SelectValidSession(csi *ClearSessionId) (sess *SessionDbRow, err error) {
   // look for the session
   err = Conf.DatabaseHandle.QueryRow(`
       SELECT 
-        session_id,
-        sys_user_id,
+        SessionId,
+        SysUserId,
         start_dt,
         expires_dt,
-        ip_addr,
-        user_agent
+        IpAddr,
+        UserAgent
       FROM session.session
-      WHERE session_id = $1`, hsess).Scan(
-    &sess.session_id,
-    &sess.sys_user_id,
+      WHERE SessionId = $1`, hsess).Scan(
+    &sess.SessionId,
+    &sess.SysUserId,
     &sess.start_dt,
     &sess.expires_dt,
-    &sess.ip_addr,
-    &sess.user_agent)
+    &sess.IpAddr,
+    &sess.UserAgent)
   if err != nil {
     return nil, err
   }
@@ -117,16 +117,16 @@ func (sr *SessionDbRow) InsertSession() (csi *ClearSessionId, err error) {
 
   insertSql := fmt.Sprintf(`
     INSERT INTO session.session (
-        session_id,
-        sys_user_id,
+        SessionId,
+        SysUserId,
         start_dt,
         expires_dt,
-        ip_addr,
-        user_agent)
+        IpAddr,
+        UserAgent)
      VALUES ($1, $2, now(), now() + interval '%d second', $3, $4)`, Conf.SessionTimeout)
 
-  _, err = Conf.DatabaseHandle.Exec(insertSql, sessionIdCrypt, sr.sys_user_id,
-    sr.ip_addr, sr.user_agent)
+  _, err = Conf.DatabaseHandle.Exec(insertSql, sessionIdCrypt, sr.SysUserId,
+    sr.IpAddr, sr.UserAgent)
 
   if err != nil {
     glog.Errorf("Insert of session row failed: %s", err)
@@ -147,7 +147,7 @@ func ContinueSession(csi *ClearSessionId) (err error) {
   updateSql := fmt.Sprintf(`
       UPDATE session.session SET
         expires_dt = now() + interval '%d second'
-      WHERE session_id = $1`, Conf.SessionTimeout)
+      WHERE SessionId = $1`, Conf.SessionTimeout)
   _, err = Conf.DatabaseHandle.Exec(updateSql, sessionIdCrypt)
 
   if err != nil {
@@ -166,7 +166,7 @@ func DeleteSession(csi *ClearSessionId) (rows int64, err error) {
     return -1, err
   }
 
-  const delsql = "DELETE FROM session.session where session_id = $1"
+  const delsql = "DELETE FROM session.session where SessionId = $1"
   result, err := Conf.DatabaseHandle.Exec(delsql, sessionIdCrypt)
   if err != nil {
     if glog.V(2) {

@@ -13,20 +13,20 @@ import (
 )
 
 type UserDbRow struct {
-  sys_user_id    string
-  email_addr     string
-  email_verified bool
-  verify_token   string
-  user_id        string
-  pw_salt        string
-  pw_crypt       string
-  first_name     string
-  last_name      string
-  created_dt     time.Time
-  login_allowed  bool
-  reset_token    string
-  reset_expires  time.Time
-  tz_name        string
+  SysUserId     string
+  EmailAddr     string
+  EmailVerified bool
+  verify_token  string
+  UserId        string
+  pw_salt       string
+  pw_crypt      string
+  FirstName     string
+  LastName      string
+  created_dt    time.Time
+  login_allowed bool
+  reset_token   string
+  reset_expires time.Time
+  TzName        string
 }
 
 type UserNullables struct {
@@ -86,42 +86,42 @@ func SelectUser(UserIdentifier string) (rw *UserDbRow, err error) {
   var nullable UserNullables
 
   const sqlfmt = `SELECT 
-                     sys_user_id, 
-                     email_addr, 
-                     email_verified, 
+                     SysUserId, 
+                     EmailAddr, 
+                     EmailVerified, 
                      verify_token, 
-                     user_id, 
+                     UserId, 
                      pw_salt, 
                      pw_crypt, 
-                     first_name, 
-                     last_name, 
+                     FirstName, 
+                     LastName, 
                      created_dt, 
                      login_allowed, 
                      reset_token, 
                      reset_expires, 
-                     tz_name 
+                     TzName 
                    FROM session.user 
                    WHERE %s = $1`
 
   // UserIdentifier is not SysUserId if it does not parse as a uuid
   _, err = uuid.ParseHex(UserIdentifier)
   if err == nil {
-    // 1. try by sys_user_id
-    err = Conf.DatabaseHandle.QueryRow(fmt.Sprintf(sqlfmt, "sys_user_id"), UserIdentifier).Scan(
-      &rw.sys_user_id,
-      &rw.email_addr,
-      &rw.email_verified,
+    // 1. try by SysUserId
+    err = Conf.DatabaseHandle.QueryRow(fmt.Sprintf(sqlfmt, "SysUserId"), UserIdentifier).Scan(
+      &rw.SysUserId,
+      &rw.EmailAddr,
+      &rw.EmailVerified,
       &nullable.verify_token,
-      &rw.user_id,
+      &rw.UserId,
       &rw.pw_salt,
       &rw.pw_crypt,
-      &rw.first_name,
-      &rw.last_name,
+      &rw.FirstName,
+      &rw.LastName,
       &rw.created_dt,
       &rw.login_allowed,
       &nullable.reset_token,
       &nullable.reset_expires,
-      &rw.tz_name)
+      &rw.TzName)
     if err == nil {
       rw.SetNullables(nullable)
       return rw, err
@@ -133,22 +133,22 @@ func SelectUser(UserIdentifier string) (rw *UserDbRow, err error) {
 
   // UserIdentifier is not EmailAddr if it does not contain @
   if strings.Index(UserIdentifier, "@") < 0 {
-    // 2. try by user_id
-    err = Conf.DatabaseHandle.QueryRow(fmt.Sprintf(sqlfmt, "user_id"), UserIdentifier).Scan(
-      &rw.sys_user_id,
-      &rw.email_addr,
-      &rw.email_verified,
+    // 2. try by UserId
+    err = Conf.DatabaseHandle.QueryRow(fmt.Sprintf(sqlfmt, "UserId"), UserIdentifier).Scan(
+      &rw.SysUserId,
+      &rw.EmailAddr,
+      &rw.EmailVerified,
       &nullable.verify_token,
-      &rw.user_id,
+      &rw.UserId,
       &rw.pw_salt,
       &rw.pw_crypt,
-      &rw.first_name,
-      &rw.last_name,
+      &rw.FirstName,
+      &rw.LastName,
       &rw.created_dt,
       &rw.login_allowed,
       &nullable.reset_token,
       &nullable.reset_expires,
-      &rw.tz_name)
+      &rw.TzName)
     if err == nil {
       rw.SetNullables(nullable)
       return rw, err
@@ -158,22 +158,22 @@ func SelectUser(UserIdentifier string) (rw *UserDbRow, err error) {
     }
   }
 
-  // 3. try by email_addr
-  err = Conf.DatabaseHandle.QueryRow(fmt.Sprintf(sqlfmt, "email_addr"), UserIdentifier).Scan(
-    &rw.sys_user_id,
-    &rw.email_addr,
-    &rw.email_verified,
+  // 3. try by EmailAddr
+  err = Conf.DatabaseHandle.QueryRow(fmt.Sprintf(sqlfmt, "EmailAddr"), UserIdentifier).Scan(
+    &rw.SysUserId,
+    &rw.EmailAddr,
+    &rw.EmailVerified,
     &nullable.verify_token,
-    &rw.user_id,
+    &rw.UserId,
     &rw.pw_salt,
     &rw.pw_crypt,
-    &rw.first_name,
-    &rw.last_name,
+    &rw.FirstName,
+    &rw.LastName,
     &rw.created_dt,
     &rw.login_allowed,
     &nullable.reset_token,
     &nullable.reset_expires,
-    &rw.tz_name)
+    &rw.TzName)
   if err == nil {
     rw.SetNullables(nullable)
     return rw, err
@@ -214,12 +214,12 @@ func (rw *UserDbRow) SetEncryptedPassword(ClearPassword string) (err error) {
 func (rw *UserDbRow) MakeSystemUserId() (string, error) {
   u4, err := uuid.NewV4()
   if err != nil {
-    glog.Errorf("Failed to generate a uuid as sys_user_id: %s", err)
+    glog.Errorf("Failed to generate a uuid as SysUserId: %s", err)
     return "", err
   }
 
-  rw.sys_user_id = u4.String()
-  return rw.sys_user_id, nil
+  rw.SysUserId = u4.String()
+  return rw.SysUserId, nil
 }
 
 // MakeVerifyToken generates a fresh UUID to use as the email verification token and returns it
@@ -233,7 +233,7 @@ func (rw *UserDbRow) MakeVerifyToken() error {
 
   rw.verify_token = u4.String()
   if glog.V(2) {
-    glog.Infof("Using %s as verify token for sys_user_id %s", rw.verify_token, rw.sys_user_id)
+    glog.Infof("Using %s as verify token for SysUserId %s", rw.verify_token, rw.SysUserId)
   }
   return nil
 }
@@ -268,7 +268,7 @@ func (rw *UserDbRow) UpdateResetToken() (clearResetToken string, err error) {
 
   clearResetToken = u4.String()
 
-  rw.reset_token, err = encryptResetToken(clearResetToken, rw.sys_user_id)
+  rw.reset_token, err = encryptResetToken(clearResetToken, rw.SysUserId)
   if err != nil {
     glog.Errorf("encryptResetToken failed: %s", err)
     return
@@ -280,9 +280,9 @@ func (rw *UserDbRow) UpdateResetToken() (clearResetToken string, err error) {
     UPDATE session.user SET
       reset_token = $1,
       reset_expires = $2
-    WHERE sys_user_id = $3`
+    WHERE SysUserId = $3`
 
-  _, err = Conf.DatabaseHandle.Query(updsql, rw.reset_token, rw.reset_expires, rw.sys_user_id)
+  _, err = Conf.DatabaseHandle.Query(updsql, rw.reset_token, rw.reset_expires, rw.SysUserId)
   if err != nil {
     glog.Errorf("Database error updating reset token: %s", err)
     return "", err
@@ -295,16 +295,16 @@ func (rw *UserDbRow) UpdateResetToken() (clearResetToken string, err error) {
 // setLoginAllowed sets the value of login_allowed, this is only used in testing
 func (rw *UserDbRow) setLoginAllowed(val bool) (err error) {
 
-  updsql := fmt.Sprintf("UPDATE session.user SET login_allowed = %t WHERE sys_user_id = $1", val)
+  updsql := fmt.Sprintf("UPDATE session.user SET login_allowed = %t WHERE SysUserId = $1", val)
 
-  _, err = Conf.DatabaseHandle.Query(updsql, rw.sys_user_id)
+  _, err = Conf.DatabaseHandle.Query(updsql, rw.SysUserId)
   if err != nil {
     glog.Errorf("Database error setting login_allowed: %s", err)
     return err
   }
 
   if glog.V(2) {
-    glog.Infof("setLoginAllowed called successfully (set to %t) for sys_user_id %s", val, rw.sys_user_id)
+    glog.Infof("setLoginAllowed called successfully (set to %t) for SysUserId %s", val, rw.SysUserId)
   }
   return
 
@@ -318,16 +318,16 @@ func (rw *UserDbRow) expireResetToken() (err error) {
   updsql := `
     UPDATE session.user SET
       reset_expires = $1
-    WHERE sys_user_id = $2 and reset_token is not null`
+    WHERE SysUserId = $2 and reset_token is not null`
 
-  _, err = Conf.DatabaseHandle.Query(updsql, rw.reset_expires, rw.sys_user_id)
+  _, err = Conf.DatabaseHandle.Query(updsql, rw.reset_expires, rw.SysUserId)
   if err != nil {
     glog.Errorf("Database error expiring reset token: %s", err)
     return err
   }
 
   if glog.V(2) {
-    glog.Infof("Expired reset token for sys_user_id %s", rw.sys_user_id)
+    glog.Infof("Expired reset token for SysUserId %s", rw.SysUserId)
   }
   return
 
@@ -339,11 +339,11 @@ func (rw *UserDbRow) RemoveResetToken() (err error) {
   const sql = `UPDATE session.user SET
     reset_token = NULL,
     reset_expires = NULL,
-    email_verified = true,
+    EmailVerified = true,
     verify_token = NULL
-    WHERE sys_user_id = $1`
+    WHERE SysUserId = $1`
 
-  result, err := Conf.DatabaseHandle.Exec(sql, rw.sys_user_id)
+  result, err := Conf.DatabaseHandle.Exec(sql, rw.SysUserId)
   if err != nil {
     return err
   }
@@ -365,34 +365,34 @@ func (rw *UserDbRow) InsertUser() (err error) {
 
   // insert into table
   const insql = `INSERT INTO session.user (
-                     sys_user_id, 
-                     email_addr, 
-                     email_verified, 
+                     SysUserId, 
+                     EmailAddr, 
+                     EmailVerified, 
                      verify_token, 
-                     user_id, 
+                     UserId, 
                      pw_salt, 
                      pw_crypt, 
-                     first_name, 
-                     last_name, 
+                     FirstName, 
+                     LastName, 
                      created_dt, 
                      login_allowed, 
                      reset_token, 
                      reset_expires, 
-                     tz_name)
+                     TzName)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), $10, NULL, NULL, $11)`
 
   _, err = Conf.DatabaseHandle.Query(insql,
-    rw.sys_user_id,
-    rw.email_addr,
-    rw.email_verified,
+    rw.SysUserId,
+    rw.EmailAddr,
+    rw.EmailVerified,
     rw.verify_token,
-    rw.user_id,
+    rw.UserId,
     rw.pw_salt,
     rw.pw_crypt,
-    rw.first_name,
-    rw.last_name,
+    rw.FirstName,
+    rw.LastName,
     rw.login_allowed,
-    rw.tz_name)
+    rw.TzName)
 
   if err != nil {
     glog.Errorf("Database error inserting user: %s", err)
@@ -411,30 +411,30 @@ func (rw *UserDbRow) UpdateUser() (err error) {
 
   vtClause := ""
   if rw.verify_token != "**KEEP**" {
-    vtClause = fmt.Sprintf(" email_verified = %t, verify_token = '%s', ", rw.email_verified, rw.verify_token)
+    vtClause = fmt.Sprintf(" EmailVerified = %t, verify_token = '%s', ", rw.EmailVerified, rw.verify_token)
   }
 
   // insert into table
   updsql := fmt.Sprintf(`
     UPDATE session.user SET
-          email_addr = $1, 
+          EmailAddr = $1, 
           %s 
-          user_id = $2, 
+          UserId = $2, 
           %s
-          first_name = $3, 
-          last_name = $4, 
+          FirstName = $3, 
+          LastName = $4, 
           login_allowed = $5, 
-          tz_name = $6
-       WHERE sys_user_id = $7`, vtClause, pwClause)
+          TzName = $6
+       WHERE SysUserId = $7`, vtClause, pwClause)
 
   _, err = Conf.DatabaseHandle.Query(updsql,
-    rw.email_addr,
-    rw.user_id,
-    rw.first_name,
-    rw.last_name,
+    rw.EmailAddr,
+    rw.UserId,
+    rw.FirstName,
+    rw.LastName,
     rw.login_allowed,
-    rw.tz_name,
-    rw.sys_user_id)
+    rw.TzName,
+    rw.SysUserId)
 
   if err != nil {
     glog.Errorf("Database error updating user: %s", err)

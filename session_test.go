@@ -153,12 +153,12 @@ func Benchmark_Add_User(b *testing.B) {
 
 }
 
-// utility test to set email_verified=T for the users created above
+// utility test to set EmailVerified=T for the users created above
 func Benchmark_email_verification(b *testing.B) {
 
-  _, err := Conf.DatabaseHandle.Exec("update session.user set email_verified = true")
+  _, err := Conf.DatabaseHandle.Exec("update session.user set EmailVerified = true")
   if err != nil {
-    b.Fatalf("Failed to updated email_verified: %s", err)
+    b.Fatalf("Failed to updated EmailVerified: %s", err)
   }
 
 }
@@ -418,24 +418,24 @@ func userCaseFactory(index int) *userCase {
         checkLoggedErrors(auResp.ValidationResult.SystemRef, t)
         checkValidationResult(t, auResp)
 
-        compareStringColumn(t, "sys_user_id", ur.sys_user_id, "**UUID**")
-        compareStringColumn(t, "email_addr", ur.email_addr, "gmurray1966@gmail.com") /* made lower */
+        compareStringColumn(t, "SysUserId", ur.SysUserId, "**UUID**")
+        compareStringColumn(t, "EmailAddr", ur.EmailAddr, "gmurray1966@gmail.com") /* made lower */
         compareStringColumn(t, "verify_token", ur.verify_token, "**UUID**")
-        compareStringColumn(t, "user_id", ur.user_id, "jdoe99")     /* trailing spaces stripped */
-        compareStringColumn(t, "first_name", ur.first_name, "Jane") /* leading spaces stripped, unchanged case */
-        compareStringColumn(t, "last_name", ur.last_name, "Doe")
+        compareStringColumn(t, "UserId", ur.UserId, "jdoe99")     /* trailing spaces stripped */
+        compareStringColumn(t, "FirstName", ur.FirstName, "Jane") /* leading spaces stripped, unchanged case */
+        compareStringColumn(t, "LastName", ur.LastName, "Doe")
         compareStringColumn(t, "reset_token", ur.reset_token, "")
         //compareStringColumn(t, "reset_expires", ur.reset_expires, exp.reset_expires)
-        compareStringColumn(t, "tz_name", ur.tz_name, "America/Los_Angeles") /* TrimSpace */
+        compareStringColumn(t, "TzName", ur.TzName, "America/Los_Angeles") /* TrimSpace */
 
         compareBoolColumn(t, "login_allowed", ur.login_allowed, true)
-        compareBoolColumn(t, "email_verified", ur.email_verified, false)
+        compareBoolColumn(t, "EmailVerified", ur.EmailVerified, false)
 
       }}
   case 1:
     return &userCase{
       descr: "update jdoe99 keep same email address",
-      suid:  SavedRow.sys_user_id,
+      suid:  SavedRow.SysUserId,
       jsonStr: fmt.Sprintf(`
         {
           "SysUserId": "%s",
@@ -446,7 +446,7 @@ func userCaseFactory(index int) *userCase {
           "TzName": "   America/Los_Angeles  \t",
           "ClearPassword": "  \u0009ODd-Pas{}[ ]( )*\\Re\"d/\\s  ",
           "ConfirmPassword": "  \u0009ODd-Pas{}[ ]( )*\\Re\"d/\\s  "
-        }`, SavedRow.sys_user_id),
+        }`, SavedRow.SysUserId),
       UserIdentifier: "jdoe99",
       loginUser:      "JDoe99",
       loginPassword:  `  \u0009ODd-Pas{}[ ]( )*\\Re\"d/\\s  `,
@@ -454,24 +454,24 @@ func userCaseFactory(index int) *userCase {
         checkLoggedErrors(auResp.ValidationResult.SystemRef, t)
         checkValidationResult(t, auResp)
 
-        compareStringColumn(t, "sys_user_id", ur.sys_user_id, SavedRow.sys_user_id)
-        compareStringColumn(t, "email_addr", ur.email_addr, "gmurray1966@gmail.com") // made lower
-        compareStringColumn(t, "verify_token", ur.verify_token, "")                  // because it is verified
-        compareStringColumn(t, "user_id", ur.user_id, "jdoe99")                      // trailing spaces stripped
-        compareStringColumn(t, "first_name", ur.first_name, "Jane")                  // leading spaces stripped, unchanged case
-        compareStringColumn(t, "last_name", ur.last_name, "Smith")
+        compareStringColumn(t, "SysUserId", ur.SysUserId, SavedRow.SysUserId)
+        compareStringColumn(t, "EmailAddr", ur.EmailAddr, "gmurray1966@gmail.com") // made lower
+        compareStringColumn(t, "verify_token", ur.verify_token, "")                // because it is verified
+        compareStringColumn(t, "UserId", ur.UserId, "jdoe99")                      // trailing spaces stripped
+        compareStringColumn(t, "FirstName", ur.FirstName, "Jane")                  // leading spaces stripped, unchanged case
+        compareStringColumn(t, "LastName", ur.LastName, "Smith")
         compareStringColumn(t, "reset_token", ur.reset_token, "")
         //compareStringColumn(t, "reset_expires", ur.reset_expires, exp.reset_expires)
-        compareStringColumn(t, "tz_name", ur.tz_name, "America/Los_Angeles") // TrimSpace
+        compareStringColumn(t, "TzName", ur.TzName, "America/Los_Angeles") // TrimSpace
 
         compareBoolColumn(t, "login_allowed", ur.login_allowed, true)
-        compareBoolColumn(t, "email_verified", ur.email_verified, true) // because it was verified in case 0
+        compareBoolColumn(t, "EmailVerified", ur.EmailVerified, true) // because it was verified in case 0
 
       }}
   case 2:
     return &userCase{
       descr: "update jdoe99 new email address no password",
-      suid:  SavedRow.sys_user_id,
+      suid:  SavedRow.SysUserId,
       jsonStr: fmt.Sprintf(`
         {
           "SysUserId": "%s",
@@ -480,7 +480,7 @@ func userCaseFactory(index int) *userCase {
           "FirstName": "  Jane",
           "LastName": "  Smith",
           "TzName": "   America/New_York  \t"
-        }`, SavedRow.sys_user_id),
+        }`, SavedRow.SysUserId),
       UserIdentifier: "jdoe99",
       loginUser:      "JDoe99",
       loginPassword:  `  \u0009ODd-Pas{}[ ]( )*\\Re\"d/\\s  `,
@@ -488,27 +488,27 @@ func userCaseFactory(index int) *userCase {
         checkLoggedErrors(auResp.ValidationResult.SystemRef, t)
         checkValidationResult(t, auResp)
 
-        compareStringColumn(t, "sys_user_id", ur.sys_user_id, SavedRow.sys_user_id)
-        compareStringColumn(t, "email_addr", ur.email_addr, "smithj@mailbot.net") /* made lower */
+        compareStringColumn(t, "SysUserId", ur.SysUserId, SavedRow.SysUserId)
+        compareStringColumn(t, "EmailAddr", ur.EmailAddr, "smithj@mailbot.net") /* made lower */
         compareStringColumn(t, "verify_token", ur.verify_token, "**UUID**")
-        if ur.verify_token == SavedRow.sys_user_id {
+        if ur.verify_token == SavedRow.SysUserId {
           t.Errorf("Expected a different verify token because the email address changed")
         }
-        compareStringColumn(t, "user_id", ur.user_id, "jdoe99")     /* trailing spaces stripped */
-        compareStringColumn(t, "first_name", ur.first_name, "Jane") /* leading spaces stripped, unchanged case */
-        compareStringColumn(t, "last_name", ur.last_name, "Smith")
+        compareStringColumn(t, "UserId", ur.UserId, "jdoe99")     /* trailing spaces stripped */
+        compareStringColumn(t, "FirstName", ur.FirstName, "Jane") /* leading spaces stripped, unchanged case */
+        compareStringColumn(t, "LastName", ur.LastName, "Smith")
         compareStringColumn(t, "reset_token", ur.reset_token, "")
         //compareStringColumn(t, "reset_expires", ur.reset_expires, exp.reset_expires)
-        compareStringColumn(t, "tz_name", ur.tz_name, "America/New_York") /* TrimSpace */
+        compareStringColumn(t, "TzName", ur.TzName, "America/New_York") /* TrimSpace */
 
         compareBoolColumn(t, "login_allowed", ur.login_allowed, true)
-        compareBoolColumn(t, "email_verified", ur.email_verified, false)
+        compareBoolColumn(t, "EmailVerified", ur.EmailVerified, false)
 
       }}
   case 3:
     return &userCase{
       descr: "update jdoe99 revert email address, change user id,  no password",
-      suid:  SavedRow.sys_user_id,
+      suid:  SavedRow.SysUserId,
       jsonStr: fmt.Sprintf(`
         {
           "SysUserId": "%s",
@@ -517,7 +517,7 @@ func userCaseFactory(index int) *userCase {
           "FirstName": "  Big Bob ",
           "LastName": "  Smith",
           "TzName": "   America/New_York  \t"
-        }`, SavedRow.sys_user_id),
+        }`, SavedRow.SysUserId),
       UserIdentifier: "smithyrules!",
       loginUser:      "JDoe99",
       loginPassword:  `  \u0009ODd-Pas{}[ ]( )*\\Re\"d/\\s  `,
@@ -525,28 +525,28 @@ func userCaseFactory(index int) *userCase {
         checkLoggedErrors(auResp.ValidationResult.SystemRef, t)
         checkValidationResult(t, auResp)
 
-        compareStringColumn(t, "sys_user_id", ur.sys_user_id, SavedRow.sys_user_id)
-        compareStringColumn(t, "email_addr", ur.email_addr, "gmurray1966@gmail.com") /* made lower */
+        compareStringColumn(t, "SysUserId", ur.SysUserId, SavedRow.SysUserId)
+        compareStringColumn(t, "EmailAddr", ur.EmailAddr, "gmurray1966@gmail.com") /* made lower */
         compareStringColumn(t, "verify_token", ur.verify_token, "**UUID**")
-        if ur.verify_token == SavedRow.sys_user_id {
+        if ur.verify_token == SavedRow.SysUserId {
           t.Errorf("Expected a different verify token because the email address changed again")
         }
-        compareStringColumn(t, "user_id", ur.user_id, "smithyrules!")  /* trailing spaces stripped */
-        compareStringColumn(t, "first_name", ur.first_name, "Big Bob") /* leading spaces stripped, unchanged case */
-        compareStringColumn(t, "last_name", ur.last_name, "Smith")
+        compareStringColumn(t, "UserId", ur.UserId, "smithyrules!")  /* trailing spaces stripped */
+        compareStringColumn(t, "FirstName", ur.FirstName, "Big Bob") /* leading spaces stripped, unchanged case */
+        compareStringColumn(t, "LastName", ur.LastName, "Smith")
         compareStringColumn(t, "reset_token", ur.reset_token, "")
         //compareStringColumn(t, "reset_expires", ur.reset_expires, exp.reset_expires)
-        compareStringColumn(t, "tz_name", ur.tz_name, "America/New_York") /* TrimSpace */
+        compareStringColumn(t, "TzName", ur.TzName, "America/New_York") /* TrimSpace */
 
         compareBoolColumn(t, "login_allowed", ur.login_allowed, true)
-        compareBoolColumn(t, "email_verified", ur.email_verified, false)
+        compareBoolColumn(t, "EmailVerified", ur.EmailVerified, false)
 
       }}
   case 4:
     SavedClearPassword = "Simple Secret99"
     return &userCase{
       descr: "update jdoe99 change password",
-      suid:  SavedRow.sys_user_id,
+      suid:  SavedRow.SysUserId,
       jsonStr: fmt.Sprintf(`
         {
           "SysUserId": "%s",
@@ -557,7 +557,7 @@ func userCaseFactory(index int) *userCase {
           "ClearPassword": "%s",
           "ConfirmPassword": "%s",
           "TzName": "   America/New_York  \t"
-        }`, SavedRow.sys_user_id, SavedClearPassword, SavedClearPassword),
+        }`, SavedRow.SysUserId, SavedClearPassword, SavedClearPassword),
       UserIdentifier: "smithyrules!",
       loginUser:      "smithyrules!",
       loginPassword:  `  \u0009ODd-Pas{}[ ]( )*\\Re\"d/\\s  `,
@@ -565,27 +565,27 @@ func userCaseFactory(index int) *userCase {
         checkLoggedErrors(auResp.ValidationResult.SystemRef, t)
         checkValidationResult(t, auResp)
 
-        compareStringColumn(t, "sys_user_id", ur.sys_user_id, SavedRow.sys_user_id)
-        compareStringColumn(t, "email_addr", ur.email_addr, "gmurray1966@gmail.com") /* made lower */
+        compareStringColumn(t, "SysUserId", ur.SysUserId, SavedRow.SysUserId)
+        compareStringColumn(t, "EmailAddr", ur.EmailAddr, "gmurray1966@gmail.com") /* made lower */
         compareStringColumn(t, "verify_token", ur.verify_token, "")
-        if ur.verify_token == SavedRow.sys_user_id {
+        if ur.verify_token == SavedRow.SysUserId {
           t.Errorf("Expected a different verify token because the email address changed again")
         }
-        compareStringColumn(t, "user_id", ur.user_id, "smithyrules!")  /* trailing spaces stripped */
-        compareStringColumn(t, "first_name", ur.first_name, "Big Bob") /* leading spaces stripped, unchanged case */
-        compareStringColumn(t, "last_name", ur.last_name, "Smith")
+        compareStringColumn(t, "UserId", ur.UserId, "smithyrules!")  /* trailing spaces stripped */
+        compareStringColumn(t, "FirstName", ur.FirstName, "Big Bob") /* leading spaces stripped, unchanged case */
+        compareStringColumn(t, "LastName", ur.LastName, "Smith")
         compareStringColumn(t, "reset_token", ur.reset_token, "")
         //compareStringColumn(t, "reset_expires", ur.reset_expires, exp.reset_expires)
-        compareStringColumn(t, "tz_name", ur.tz_name, "America/New_York") /* TrimSpace */
+        compareStringColumn(t, "TzName", ur.TzName, "America/New_York") /* TrimSpace */
 
         compareBoolColumn(t, "login_allowed", ur.login_allowed, true)
-        compareBoolColumn(t, "email_verified", ur.email_verified, true)
+        compareBoolColumn(t, "EmailVerified", ur.EmailVerified, true)
 
       }}
   case 5:
     return &userCase{
       descr: "update attempt with bad SysUserId",
-      suid:  SavedRow.sys_user_id,
+      suid:  SavedRow.SysUserId,
       jsonStr: `
         {
           "SysUserId": "6ba7b814-9dad-11d1-80b4-00c04fd430c8",
@@ -602,21 +602,21 @@ func userCaseFactory(index int) *userCase {
         checkLoggedErrors(auResp.ValidationResult.SystemRef, t)
         checkBadValidationResult(t, "SysUserId", "Does not match UUID in URL", auResp)
 
-        compareStringColumn(t, "sys_user_id", ur.sys_user_id, SavedRow.sys_user_id)
-        compareStringColumn(t, "email_addr", ur.email_addr, "gmurray1966@gmail.com") /* made lower */
+        compareStringColumn(t, "SysUserId", ur.SysUserId, SavedRow.SysUserId)
+        compareStringColumn(t, "EmailAddr", ur.EmailAddr, "gmurray1966@gmail.com") /* made lower */
         compareStringColumn(t, "verify_token", ur.verify_token, "")
-        if ur.verify_token == SavedRow.sys_user_id {
+        if ur.verify_token == SavedRow.SysUserId {
           t.Errorf("Expected a different verify token because the email address changed again")
         }
-        compareStringColumn(t, "user_id", ur.user_id, "smithyrules!")  /* trailing spaces stripped */
-        compareStringColumn(t, "first_name", ur.first_name, "Big Bob") /* leading spaces stripped, unchanged case */
-        compareStringColumn(t, "last_name", ur.last_name, "Smith")
+        compareStringColumn(t, "UserId", ur.UserId, "smithyrules!")  /* trailing spaces stripped */
+        compareStringColumn(t, "FirstName", ur.FirstName, "Big Bob") /* leading spaces stripped, unchanged case */
+        compareStringColumn(t, "LastName", ur.LastName, "Smith")
         compareStringColumn(t, "reset_token", ur.reset_token, "")
         //compareStringColumn(t, "reset_expires", ur.reset_expires, exp.reset_expires)
-        compareStringColumn(t, "tz_name", ur.tz_name, "America/New_York") /* TrimSpace */
+        compareStringColumn(t, "TzName", ur.TzName, "America/New_York") /* TrimSpace */
 
         compareBoolColumn(t, "login_allowed", ur.login_allowed, true)
-        compareBoolColumn(t, "email_verified", ur.email_verified, true)
+        compareBoolColumn(t, "EmailVerified", ur.EmailVerified, true)
 
       }}
   default:
@@ -720,9 +720,9 @@ func Test_AddUser(t *testing.T) {
 
     c.expector(auResp, ur, t)
 
-    if !ur.email_verified {
+    if !ur.EmailVerified {
       // process validation email like a user would
-      compareEmailValues(ur.email_addr, ur.verify_token, t)
+      compareEmailValues(ur.EmailAddr, ur.verify_token, t)
 
       afterUr, err := SelectUser(c.UserIdentifier)
       if err != nil {
@@ -733,10 +733,10 @@ func Test_AddUser(t *testing.T) {
         t.Fatalf("Expected verify_token to be blank, but it was %s", afterUr.verify_token)
       }
 
-      if !afterUr.email_verified {
-        t.Fatal("email_verified should be true")
+      if !afterUr.EmailVerified {
+        t.Fatal("EmailVerified should be true")
       }
-      t.Logf("  - email %s was verified successfully", ur.email_addr)
+      t.Logf("  - email %s was verified successfully", ur.EmailAddr)
     }
 
     // The last case is saved in SavedRow
@@ -975,33 +975,33 @@ func loginCaseFactory(index int) *loginCase {
   case 1:
     return &loginCase{"ClearPassword is required", `{"UserIdentifier":"loser", "ClearPassword":""}`, Result{StatusInvalid, "Authentication failed", "", "ClearPassword", "Missing data"}, false, "blank password"}
   case 2:
-    return &loginCase{"Correct SysUserId with bad password", fmt.Sprintf(`{"UserIdentifier":"  %s", "ClearPassword":"bad"}`, strings.ToUpper(SavedRow.sys_user_id)), Result{StatusInvalid, "Authentication failed", "", "", ""}, false, "passwords did not match"}
+    return &loginCase{"Correct SysUserId with bad password", fmt.Sprintf(`{"UserIdentifier":"  %s", "ClearPassword":"bad"}`, strings.ToUpper(SavedRow.SysUserId)), Result{StatusInvalid, "Authentication failed", "", "", ""}, false, "passwords did not match"}
   case 3:
-    return &loginCase{"Correct UserId with bad password", fmt.Sprintf(`{"UserIdentifier":" %s ", "ClearPassword":"bad"}`, SavedRow.user_id), Result{StatusInvalid, "Authentication failed", "", "", ""}, false, "passwords did not match"}
+    return &loginCase{"Correct UserId with bad password", fmt.Sprintf(`{"UserIdentifier":" %s ", "ClearPassword":"bad"}`, SavedRow.UserId), Result{StatusInvalid, "Authentication failed", "", "", ""}, false, "passwords did not match"}
   case 4:
-    return &loginCase{"Correct EmailAddr with bad password", fmt.Sprintf(`{"UserIdentifier":"%s  ", "ClearPassword":"bad"}`, SavedRow.email_addr), Result{StatusInvalid, "Authentication failed", "", "", ""}, false, "passwords did not match"}
+    return &loginCase{"Correct EmailAddr with bad password", fmt.Sprintf(`{"UserIdentifier":"%s  ", "ClearPassword":"bad"}`, SavedRow.EmailAddr), Result{StatusInvalid, "Authentication failed", "", "", ""}, false, "passwords did not match"}
   case 5:
-    return &loginCase{"UserIdentifier is EmailAddr", fmt.Sprintf(`{"UserIdentifier":"%s  ", "ClearPassword":"%s"}`, SavedRow.email_addr, SavedClearPassword), Result{StatusOK, "Authentication successful", "", "", ""}, true, fmt.Sprintf("using password for SysUserId %s", SavedRow.sys_user_id)}
+    return &loginCase{"UserIdentifier is EmailAddr", fmt.Sprintf(`{"UserIdentifier":"%s  ", "ClearPassword":"%s"}`, SavedRow.EmailAddr, SavedClearPassword), Result{StatusOK, "Authentication successful", "", "", ""}, true, fmt.Sprintf("using password for SysUserId %s", SavedRow.SysUserId)}
   case 6:
-    return &loginCase{"UserIdentifier is SysUserId", fmt.Sprintf(`{"UserIdentifier":"%s  ", "ClearPassword":"%s"}`, SavedRow.sys_user_id, SavedClearPassword), Result{StatusOK, "Authentication successful", "", "", ""}, true, fmt.Sprintf("using password for SysUserId %s", SavedRow.sys_user_id)}
+    return &loginCase{"UserIdentifier is SysUserId", fmt.Sprintf(`{"UserIdentifier":"%s  ", "ClearPassword":"%s"}`, SavedRow.SysUserId, SavedClearPassword), Result{StatusOK, "Authentication successful", "", "", ""}, true, fmt.Sprintf("using password for SysUserId %s", SavedRow.SysUserId)}
   case 7:
-    return &loginCase{"UserIdentifier is UserId", fmt.Sprintf(`{"UserIdentifier":"%s  ", "ClearPassword":"%s"}`, SavedRow.user_id, SavedClearPassword), Result{StatusOK, "Authentication successful", "", "", ""}, true, fmt.Sprintf("using password for SysUserId %s", SavedRow.sys_user_id)}
+    return &loginCase{"UserIdentifier is UserId", fmt.Sprintf(`{"UserIdentifier":"%s  ", "ClearPassword":"%s"}`, SavedRow.UserId, SavedClearPassword), Result{StatusOK, "Authentication successful", "", "", ""}, true, fmt.Sprintf("using password for SysUserId %s", SavedRow.SysUserId)}
   case 8:
-    return &loginCase{"SessionToken is not UUID", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"wtf", "Salt":""}`, SavedRow.sys_user_id), Result{StatusInvalid, "Authentication failed", "", "SessionToken", "Invalid data"}, false, "Error during SelectValidSession call: SessionToken (wtf) is not a UUID"}
+    return &loginCase{"SessionToken is not UUID", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"wtf", "Salt":""}`, SavedRow.SysUserId), Result{StatusInvalid, "Authentication failed", "", "SessionToken", "Invalid data"}, false, "Error during SelectValidSession call: SessionToken (wtf) is not a UUID"}
   case 9:
-    return &loginCase{"Salt is missing", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"6ba7b814-9dad-11d1-80b4-00c04fd430c8", "Salt":""}`, SavedRow.sys_user_id), Result{StatusInvalid, "Authentication failed", "", "SessionToken", "Invalid data"}, false, "Error during SelectValidSession call: Salt is missing"}
+    return &loginCase{"Salt is missing", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"6ba7b814-9dad-11d1-80b4-00c04fd430c8", "Salt":""}`, SavedRow.SysUserId), Result{StatusInvalid, "Authentication failed", "", "SessionToken", "Invalid data"}, false, "Error during SelectValidSession call: Salt is missing"}
   case 10:
-    return &loginCase{"Salt is unparsable", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"6ba7b814-9dad-11d1-80b4-00c04fd430c8", "Salt":"wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-"}`, SavedRow.sys_user_id), Result{StatusInvalid, "Authentication failed", "", "SessionToken", "Invalid data"}, false, "Error during SelectValidSession call: Encryption failed: encoding/hex: invalid byte: U+0077"}
+    return &loginCase{"Salt is unparsable", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"6ba7b814-9dad-11d1-80b4-00c04fd430c8", "Salt":"wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-"}`, SavedRow.SysUserId), Result{StatusInvalid, "Authentication failed", "", "SessionToken", "Invalid data"}, false, "Error during SelectValidSession call: Encryption failed: encoding/hex: invalid byte: U+0077"}
   case 11:
-    return &loginCase{"Salt is too long", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"6ba7b814-9dad-11d1-80b4-00c04fd430c8", "Salt":"00c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c8"}`, SavedRow.sys_user_id), Result{StatusInvalid, "Authentication failed", "", "SessionToken", "Invalid data"}, false, "Error during SelectValidSession call: Salt must be 32 bytes but was 132 bytes"}
+    return &loginCase{"Salt is too long", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"6ba7b814-9dad-11d1-80b4-00c04fd430c8", "Salt":"00c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c8"}`, SavedRow.SysUserId), Result{StatusInvalid, "Authentication failed", "", "SessionToken", "Invalid data"}, false, "Error during SelectValidSession call: Salt must be 32 bytes but was 132 bytes"}
   case 12:
-    return &loginCase{"Happy path with SessionToken and SysUserId", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"%s", "Salt":"%s"}`, SavedRow.sys_user_id, SavedSessionToken, SavedSessionSalt), Result{StatusOK, "Authentication successful", "", "", ""}, true, fmt.Sprintf("Session %s using token for SysUserId %s", SavedSessionToken[:8], SavedRow.sys_user_id)}
+    return &loginCase{"Happy path with SessionToken and SysUserId", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"%s", "Salt":"%s"}`, SavedRow.SysUserId, SavedSessionToken, SavedSessionSalt), Result{StatusOK, "Authentication successful", "", "", ""}, true, fmt.Sprintf("Session %s using token for SysUserId %s", SavedSessionToken[:8], SavedRow.SysUserId)}
   case 13:
-    return &loginCase{"Happy path with SessionToken and UserId", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"%s", "Salt":"%s"}`, SavedRow.user_id, SavedSessionToken, SavedSessionSalt), Result{StatusOK, "Authentication successful", "", "", ""}, true, fmt.Sprintf("Session %s using token for SysUserId %s", SavedSessionToken[:8], SavedRow.sys_user_id)}
+    return &loginCase{"Happy path with SessionToken and UserId", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"%s", "Salt":"%s"}`, SavedRow.UserId, SavedSessionToken, SavedSessionSalt), Result{StatusOK, "Authentication successful", "", "", ""}, true, fmt.Sprintf("Session %s using token for SysUserId %s", SavedSessionToken[:8], SavedRow.SysUserId)}
   case 14:
-    return &loginCase{"login_allowed = false", fmt.Sprintf(`{"UserIdentifier":"%s  ", "ClearPassword":"%s"}`, SavedRow.user_id, SavedClearPassword), Result{StatusInvalid, "Login is not permitted", "", "", ""}, false, "login not permitted"}
+    return &loginCase{"login_allowed = false", fmt.Sprintf(`{"UserIdentifier":"%s  ", "ClearPassword":"%s"}`, SavedRow.UserId, SavedClearPassword), Result{StatusInvalid, "Login is not permitted", "", "", ""}, false, "login not permitted"}
   case 15:
-    return &loginCase{"email_verified = false", fmt.Sprintf(`{"UserIdentifier":"%s  ", "ClearPassword":"%s"}`, SavedRow.user_id, SavedClearPassword), Result{StatusInvalid, "Login is not permitted with unverified email address. Email was sent to gmurray1966@gmail.com", "", "", ""}, false, "login not permitted with unverified email"}
+    return &loginCase{"EmailVerified = false", fmt.Sprintf(`{"UserIdentifier":"%s  ", "ClearPassword":"%s"}`, SavedRow.UserId, SavedClearPassword), Result{StatusInvalid, "Login is not permitted with unverified email address. Email was sent to gmurray1966@gmail.com", "", "", ""}, false, "login not permitted with unverified email"}
   default:
     return nil
   }
@@ -1095,14 +1095,14 @@ func Test_Login_table(t *testing.T) {
     t.Logf("Case %d: %s", i, cur.desc)
 
     if i == 14 {
-      _, err := Conf.DatabaseHandle.Exec("update session.user set login_allowed = false where sys_user_id = $1", SavedRow.sys_user_id)
+      _, err := Conf.DatabaseHandle.Exec("update session.user set login_allowed = false where SysUserId = $1", SavedRow.SysUserId)
       if err != nil {
         t.Fatalf("Failed to updated login_allowed: %s", err)
       }
     }
 
     if i == 15 {
-      _, err := Conf.DatabaseHandle.Exec("update session.user set email_verified = false, verify_token = $1 where sys_user_id = $2", tempToken, SavedRow.sys_user_id)
+      _, err := Conf.DatabaseHandle.Exec("update session.user set EmailVerified = false, verify_token = $1 where SysUserId = $2", tempToken, SavedRow.SysUserId)
       if err != nil {
         t.Fatalf("Failed to updated login_allowed: %s", err)
       }
@@ -1112,11 +1112,11 @@ func Test_Login_table(t *testing.T) {
 
     if i == 15 {
       // process the email verification
-      compareEmailValues(SavedRow.email_addr, tempToken, t)
+      compareEmailValues(SavedRow.EmailAddr, tempToken, t)
     }
 
     if i == 14 {
-      _, err := Conf.DatabaseHandle.Exec("update session.user set login_allowed = true where sys_user_id = $1", SavedRow.sys_user_id)
+      _, err := Conf.DatabaseHandle.Exec("update session.user set login_allowed = true where SysUserId = $1", SavedRow.SysUserId)
       if err != nil {
         t.Fatalf("Failed to updated login_allowed: %s", err)
       }
@@ -1279,7 +1279,7 @@ func useResetTokenInEmail(t *testing.T, inEmailAddr string) *LoginResponse {
 }
 
 // tests url /session/reset/  (i.e. blank email address)
-func Test_doReset_blank_email_address(t *testing.T) {
+func Test_doReset_blank_EmailAddress(t *testing.T) {
 
   client := initClient()
   addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
@@ -1336,9 +1336,9 @@ func Test_doReset_on_already_reset(t *testing.T) {
     t.Fatal("SavedRow failed to save in previous test")
   }
 
-  doResetPassword(t, SavedRow.email_addr, "Created a reset token for email addess "+SavedRow.email_addr)
+  doResetPassword(t, SavedRow.EmailAddr, "Created a reset token for email addess "+SavedRow.EmailAddr)
 
-  ur, err := SelectUser(SavedRow.email_addr)
+  ur, err := SelectUser(SavedRow.EmailAddr)
   if err != nil {
     t.Fatalf("SelectUser returned with error: %s", err)
   }
@@ -1347,7 +1347,7 @@ func Test_doReset_on_already_reset(t *testing.T) {
 
   // We now have a user who has requested a password reset
 
-  doResetPassword(t, SavedRow.email_addr, "Active reset token already exists for "+SavedRow.email_addr)
+  doResetPassword(t, SavedRow.EmailAddr, "Active reset token already exists for "+SavedRow.EmailAddr)
 }
 
 func Test_doReset_on_expired_reset(t *testing.T) {
@@ -1362,14 +1362,14 @@ func Test_doReset_on_expired_reset(t *testing.T) {
   oldResetToken := SavedRow.reset_token
 
   // get the email to clear all emails
-  _, err = getEmail(SavedRow.email_addr)
+  _, err = getEmail(SavedRow.EmailAddr)
   if err != nil {
     t.Fatalf("getEmail returned an error: %s", err)
   }
 
-  doResetPassword(t, SavedRow.email_addr, "Created a reset token for email addess "+SavedRow.email_addr)
+  doResetPassword(t, SavedRow.EmailAddr, "Created a reset token for email addess "+SavedRow.EmailAddr)
 
-  ur, err := SelectUser(SavedRow.email_addr)
+  ur, err := SelectUser(SavedRow.EmailAddr)
   if err != nil {
     t.Fatalf("SelectUser returned with error: %s", err)
   }
@@ -1382,7 +1382,7 @@ func Test_doReset_on_expired_reset(t *testing.T) {
 }
 
 func Test_useReset_success(t *testing.T) {
-  lr := useResetTokenInEmail(t, SavedRow.email_addr)
+  lr := useResetTokenInEmail(t, SavedRow.EmailAddr)
 
   tok := SavedCookieMap["SessionToken"].Value
   salt := SavedCookieMap["Salt"].Value
@@ -1410,10 +1410,10 @@ func Test_useReset_success(t *testing.T) {
   }
 
   expectResult(Result{Status: StatusOK, Message: "Reset request is valid", PropInError: "", PropErrorMsg: ""}, lr.ValidationResult, t)
-  mustExistInLog(lr.ValidationResult.SystemRef, fmt.Sprintf("Reset request is valid for email %s", SavedRow.email_addr), t)
+  mustExistInLog(lr.ValidationResult.SystemRef, fmt.Sprintf("Reset request is valid for email %s", SavedRow.EmailAddr), t)
 
-  // check fields updated: reset_token, email_verified, verify_token
-  ur, err := SelectUser(SavedRow.email_addr)
+  // check fields updated: reset_token, EmailVerified, verify_token
+  ur, err := SelectUser(SavedRow.EmailAddr)
   if err != nil {
     t.Fatalf("SelectUser returned with error: %s", err)
   }
@@ -1427,14 +1427,14 @@ func Test_useReset_success(t *testing.T) {
     t.Fatal("Expected verify_token to be blank")
   }
 
-  if !SavedRow.email_verified {
-    t.Fatal("Expected email_verified to be true")
+  if !SavedRow.EmailVerified {
+    t.Fatal("Expected EmailVerified to be true")
   }
 }
 
 func Test_useReset_token_is_not_UUID(t *testing.T) {
 
-  lr, err := resetEmailTest(SavedRow.email_addr, "not_real_token", t)
+  lr, err := resetEmailTest(SavedRow.EmailAddr, "not_real_token", t)
   if err != nil {
     t.Fatalf("Unexpected error while resetting: %s", err)
   }
@@ -1445,7 +1445,7 @@ func Test_useReset_token_is_not_UUID(t *testing.T) {
 
 func Test_useReset_token_is_not_in_db(t *testing.T) {
 
-  lr, err := resetEmailTest(SavedRow.email_addr, "4acc6c82-667c-4e4b-6a52-d5dfdc188007", t)
+  lr, err := resetEmailTest(SavedRow.EmailAddr, "4acc6c82-667c-4e4b-6a52-d5dfdc188007", t)
   if err != nil {
     t.Fatalf("Unexpected error while resetting: %s", err)
   }
@@ -1456,7 +1456,7 @@ func Test_useReset_token_is_not_in_db(t *testing.T) {
 }
 
 func Test_useReset_on_expired_reset(t *testing.T) {
-  doResetPassword(t, SavedRow.email_addr, "Created a reset token for email addess "+SavedRow.email_addr)
+  doResetPassword(t, SavedRow.EmailAddr, "Created a reset token for email addess "+SavedRow.EmailAddr)
 
   // force the expiration of the token
   err := SavedRow.expireResetToken()
@@ -1464,7 +1464,7 @@ func Test_useReset_on_expired_reset(t *testing.T) {
     t.Fatalf("expireResetToken returned with error: %s", err)
   }
 
-  lr := useResetTokenInEmail(t, SavedRow.email_addr)
+  lr := useResetTokenInEmail(t, SavedRow.EmailAddr)
 
   expectResult(Result{Status: StatusInvalid, Message: "Reset failed", PropInError: "", PropErrorMsg: ""}, lr.ValidationResult, t)
   mustExistInLog(lr.ValidationResult.SystemRef, "Reset token is expired", t)
@@ -1476,7 +1476,7 @@ func Test_doReset_login_disallowed(t *testing.T) {
     t.Fatalf("setLoginAllowed returned with error: %s", err)
   }
 
-  doResetPassword(t, SavedRow.email_addr, "login_allowed is false")
+  doResetPassword(t, SavedRow.EmailAddr, "login_allowed is false")
 
   err = SavedRow.setLoginAllowed(true)
   if err != nil {
@@ -1491,14 +1491,14 @@ func Test_useReset_login_disallowed(t *testing.T) {
     t.Fatalf("setLoginAllowed returned with error: %s", err)
   }
 
-  doResetPassword(t, SavedRow.email_addr, "Created a reset token for email addess "+SavedRow.email_addr)
+  doResetPassword(t, SavedRow.EmailAddr, "Created a reset token for email addess "+SavedRow.EmailAddr)
 
   err = SavedRow.setLoginAllowed(false)
   if err != nil {
     t.Fatalf("setLoginAllowed returned with error: %s", err)
   }
 
-  lr := useResetTokenInEmail(t, SavedRow.email_addr)
+  lr := useResetTokenInEmail(t, SavedRow.EmailAddr)
 
   expectResult(Result{Status: StatusInvalid, Message: "Reset failed", PropInError: "", PropErrorMsg: ""}, lr.ValidationResult, t)
   mustExistInLog(lr.ValidationResult.SystemRef, "login_allowed is false", t)

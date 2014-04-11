@@ -2,29 +2,29 @@ DROP SCHEMA IF EXISTS session CASCADE;
 CREATE SCHEMA session;
 
 CREATE TABLE IF NOT EXISTS session.user (
-  sys_user_id char(36) PRIMARY KEY,
-  email_addr varchar(256) UNIQUE NOT NULL,
-  email_verified boolean NOT NULL,
+  SysUserId char(36) PRIMARY KEY,
+  EmailAddr varchar(256) UNIQUE NOT NULL,
+  EmailVerified boolean NOT NULL,
   verify_token char(36),
-  user_id varchar(256) UNIQUE NOT NULL,
+  UserId varchar(256) UNIQUE NOT NULL,
   pw_salt varchar(256) NOT NULL,
   pw_crypt varchar(256) NOT NULL,
-  first_name varchar(256) NOT NULL,
-  last_name varchar(256) NOT NULL,
+  FirstName varchar(256) NOT NULL,
+  LastName varchar(256) NOT NULL,
   created_dt timestamp with time zone NOT NULL,
   login_allowed boolean NOT NULL,
   reset_token varchar(256) UNIQUE, /* encrypted */
   reset_expires timestamp with time zone,
-  tz_name varchar(256) NOT NULL
+  TzName varchar(256) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS session.session (
-  session_id varchar(256) PRIMARY KEY,
-  sys_user_id char(36) REFERENCES session.user (sys_user_id),
+  SessionId varchar(256) PRIMARY KEY,
+  SysUserId char(36) REFERENCES session.user (SysUserId),
   start_dt timestamp with time zone NOT NULL,
   expires_dt timestamp with time zone NOT NULL,
-  ip_addr varchar(256) NOT NULL,
-  user_agent varchar(256) NOT NULL
+  IpAddr varchar(256) NOT NULL,
+  UserAgent varchar(256) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS session.config (

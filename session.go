@@ -35,15 +35,6 @@ const (
 )
 
 // All responses are sent with the JSON encoding of an instance of type Result. The possible values for Status are held in constants StatusOK, StatusInvalid, for example:
-//
-//    ...
-//    "ValidationResult": {
-//      "Status": "Invalid",
-//      "Message": "Athentication failed",
-//      "SystemRef": "doLogin-31661",
-//      "PropInError": "UserIdentifier",
-//      "PropErrorMsg": "Missing data"
-//    }
 type Result struct {
   Status       string
   Message      string
@@ -52,22 +43,11 @@ type Result struct {
   PropErrorMsg string // error message related to the PropInError
 }
 
-/* Type UserRequest is the type used for initially creating a user and for updating an existing user. The field SysUserId is blank for insert otherwise it contains the system id assigned when inserted. For example:
-
-   {
-     "EmailAddr": "JaneDoe@Example.Org",
-     "UserId": "JDoe99",
-     "FirstName": "Jane",
-     "LastName": "Doe",
-     "TzName": "America/Los_Angeles",
-     "ClearPassword": "big-secret-2000",
-     "ConfirmPassword": "big-secret-2000"
-   }
-*/
+/* Type UserRequest is the type used for initially creating a user and for updating an existing user. The field SysUserId is blank for insert otherwise it contains the system id assigned when inserted. */
 type UserRequest struct {
   SysUserId       string // blank for insert
-  EmailAddr       string // stored as trimmed lower case
-  UserId          string // stored as trimmed lower case
+  EmailAddr       string
+  UserId          string
   FirstName       string
   LastName        string
   TzName          string
@@ -80,7 +60,7 @@ type UserResponse struct {
   ValidationResult Result
 }
 
-// type verifyEmailTemplateParams holds the values used in the template used to construct the body of the email
+// Type verifyEmailTemplateParams holds the values used in the template used to construct the body of the email
 type verifyEmailTemplateParams struct {
   EmailAddr string
   FirstName string
@@ -280,7 +260,7 @@ func validUserRequest(uReq *UserRequest, doingInsert bool, givenSysUserId string
   }
 
   // verify EmailAddr unique
-  lookupSql := "select count(*) as cnt from session.user where email_addr = $1 and sys_user_id != $2"
+  lookupSql := "select count(*) as cnt from session.user where EmailAddr = $1 and SysUserId != $2"
   err = Conf.DatabaseHandle.QueryRow(lookupSql, uReq.EmailAddr, uReq.SysUserId).Scan(&count)
 
   switch {
@@ -308,7 +288,7 @@ func validUserRequest(uReq *UserRequest, doingInsert bool, givenSysUserId string
   }
 
   // verify UserId unique
-  lookupSql = "select count(*) as cnt from session.user where user_id = $1 and sys_user_id != $2"
+  lookupSql = "select count(*) as cnt from session.user where UserId = $1 and SysUserId != $2"
   err = Conf.DatabaseHandle.QueryRow(lookupSql, uReq.UserId, uReq.SysUserId).Scan(&count)
 
   switch {
@@ -437,11 +417,11 @@ func doUser(rw http.ResponseWriter, req *http.Request) {
 
   // prepare the UserRow
   var userRow = new(UserDbRow)
-  userRow.email_addr = uReq.EmailAddr
-  userRow.user_id = uReq.UserId
-  userRow.first_name = uReq.FirstName
-  userRow.last_name = uReq.LastName
-  userRow.tz_name = uReq.TzName
+  userRow.EmailAddr = uReq.EmailAddr
+  userRow.UserId = uReq.UserId
+  userRow.FirstName = uReq.FirstName
+  userRow.LastName = uReq.LastName
+  userRow.TzName = uReq.TzName
   userRow.login_allowed = true // TODO feature to set this after registration
 
   if doingInsert {
@@ -453,7 +433,7 @@ func doUser(rw http.ResponseWriter, req *http.Request) {
     }
   } else {
     uResp.SysUserId = givenSysUserId
-    userRow.sys_user_id = givenSysUserId
+    userRow.SysUserId = givenSysUserId
   }
 
   // pw_crypt will not be updated if it is blank
@@ -473,14 +453,14 @@ func doUser(rw http.ResponseWriter, req *http.Request) {
       return
     }
 
-    if oldRow.email_addr == userRow.email_addr {
+    if oldRow.EmailAddr == userRow.EmailAddr {
       emailChanged = false
       if glog.V(2) {
-        glog.Infof("%s Email address unchanged %s", localPrefix, userRow.email_addr)
+        glog.Infof("%s Email address unchanged %s", localPrefix, userRow.EmailAddr)
       }
     } else {
       if glog.V(2) {
-        glog.Infof("%s Email address changed from %s --> %s", localPrefix, oldRow.email_addr, userRow.email_addr)
+        glog.Infof("%s Email address changed from %s --> %s", localPrefix, oldRow.EmailAddr, userRow.EmailAddr)
       }
     }
   }
@@ -491,7 +471,7 @@ func doUser(rw http.ResponseWriter, req *http.Request) {
       uResp.ValidationResult.Message = "System error while generating email verification token"
       return
     }
-    userRow.email_verified = false
+    userRow.EmailVerified = false
   } else {
     userRow.verify_token = "**KEEP**"
   }
@@ -529,8 +509,6 @@ func doUser(rw http.ResponseWriter, req *http.Request) {
   if glog.V(1) {
     glog.Infof("%s %s: id=%s em=%s fn=%s ln=%s sys=%s", localPrefix, x, uReq.UserId, uReq.EmailAddr, uReq.FirstName, uReq.LastName, uResp.SysUserId)
   }
-
-  // BUG(glm) Feature?: Send an email to the administrator, when a new user registers. This obviously would only be switched on for cases where the userbase is small.
 
   uResp.ValidationResult.Status = StatusOK
   uResp.ValidationResult.Message = x + " successfully"
@@ -589,7 +567,7 @@ func verifyEmail(rw http.ResponseWriter, req *http.Request) {
   }
 
   // check the database
-  const sql = "update session.user set verify_token = null, email_verified = true where email_addr = $1 and verify_token = $2"
+  const sql = "update session.user set verify_token = null, EmailVerified = true where EmailAddr = $1 and verify_token = $2"
   result, err := Conf.DatabaseHandle.Exec(sql, response.EmailAddr, response.Token)
   if err != nil {
     if glog.V(2) {
@@ -613,19 +591,6 @@ func verifyEmail(rw http.ResponseWriter, req *http.Request) {
   }
 }
 
-/* To start a new session (login), one can identify with EmailAddr, UserId or the system assigned SysUserId. As follows:
-   {
-     "UserIdentifier": "janedoe@example.org",
-     "ClearPassword": "big-secret-2000"
-   }
-
-   To continue a session that has not expired then a SessionToken and Salt can be sent. As follows:
-   {
-     "UserIdentifier": "6ba7b814-9dad-11d1-80b4-00c04fd430c8",
-     "SessionToken": "4fd77149-561f-48a5-728e-f6be227c0ea4",
-     "Salt": "cf84e7b37d3e8ce781f158a38685da512f1954b3e8a7bb5772489cc03c3f93f7"
-   }
-*/
 type LoginRequest struct {
   UserIdentifier string // EmailAddr|SysUserId|UserId
   ClearPassword  string // not in db
@@ -634,28 +599,6 @@ type LoginRequest struct {
   Salt         string // needed because SessionToken is encrypted on the server
 }
 
-/* Type LoginResponse corresponds to the JSON response to a successful LoginRequest
-
-   {
-     "SessionToken": "fbf8b99c-ea3f-4f13-7fc8-c3911da17a30",
-     "Salt": "aac7bbc9b39056afa13406641271d0b905d9f0bffea07b5733d4e237ee885ca6",
-     "SessionTTL": 600,
-     "SysUserId": "11f5f940-b2a2-4847-48c1-c00dd2771c49",
-     "UserId": "selenium-one",
-     "EmailAddr": "georgek@mailbot.net",
-     "EmailVerified": true,
-     "FirstName": "George",
-     "LastName": "Katsiopolous",
-     "TzName": "America/Los_Angeles",
-     "ValidationResult": {
-         "Status": "OK",
-         "Message": "Authentication successful",
-         "SystemRef": "doLogin-32822:",
-         "PropInError": "",
-         "PropErrorMsg": ""
-     }
-   }
-*/
 type LoginResponse struct {
   SessionToken     string // UUID representing the session (also in a cookie)
   Salt             string // needed because SessionToken is encrypted on the server (also in a cookie)
@@ -679,16 +622,17 @@ func DefaultLoginResponse(localPrefix string) (resp *LoginResponse) {
 
 func (loginResp *LoginResponse) setUserData(userRow UserDbRow) {
   loginResp.SessionTTL = Conf.SessionTimeout
-  loginResp.SysUserId = userRow.sys_user_id
-  loginResp.EmailAddr = userRow.email_addr
-  loginResp.EmailVerified = userRow.email_verified
-  loginResp.UserId = userRow.user_id
-  loginResp.FirstName = userRow.first_name
-  loginResp.LastName = userRow.last_name
-  loginResp.TzName = userRow.tz_name
+  loginResp.SysUserId = userRow.SysUserId
+  loginResp.EmailAddr = userRow.EmailAddr
+  loginResp.EmailVerified = userRow.EmailVerified
+  loginResp.UserId = userRow.UserId
+  loginResp.FirstName = userRow.FirstName
+  loginResp.LastName = userRow.LastName
+  loginResp.TzName = userRow.TzName
 }
 
 // genericLogin is called as a web service (doLogin) and as a package func (Verify)
+// genericLogin checks the database for a valid session (cache has already been checked)
 func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginRequest, loginResp *LoginResponse) {
 
   if loginResp == nil {
@@ -758,16 +702,16 @@ func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginReques
 
     // QUESTION: If a user is roaming on a cellular network, does their IP address change?
     //           If yes, then this check may be incorrect.
-    if ipAddress != sessionRow.ip_addr {
+    if ipAddress != sessionRow.IpAddr {
       if glog.V(2) {
-        glog.Infof("%s IP address changed from %s to %s, cannot use session token to login", localPrefix, sessionRow.ip_addr, ipAddress)
+        glog.Infof("%s IP address changed from %s to %s, cannot use session token to login", localPrefix, sessionRow.IpAddr, ipAddress)
       }
       return
     }
 
-    if userAgent != sessionRow.user_agent {
+    if userAgent != sessionRow.UserAgent {
       if glog.V(2) {
-        glog.Infof("%s user agent changed from %s to %s, cannot use session token to login", localPrefix, userAgent, sessionRow.user_agent)
+        glog.Infof("%s user agent changed from %s to %s, cannot use session token to login", localPrefix, userAgent, sessionRow.UserAgent)
       }
       return
     }
@@ -783,20 +727,20 @@ func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginReques
   }
 
   // Check if email is verified
-  if !userRow.email_verified {
+  if !userRow.EmailVerified {
     if len(userRow.verify_token) != 36 {
-      glog.Errorf("%s email_verified is false, but verify_token is invalid on user %s", localPrefix, userRow.email_addr)
+      glog.Errorf("%s EmailVerified is false, but verify_token is invalid on user %s", localPrefix, userRow.EmailAddr)
     }
 
     if glog.V(2) {
       glog.Infof("%s login not permitted with unverified email address", localPrefix)
     }
-    loginResp.ValidationResult.Message = fmt.Sprintf("Login is not permitted with unverified email address. Email was sent to %s", userRow.email_addr)
+    loginResp.ValidationResult.Message = fmt.Sprintf("Login is not permitted with unverified email address. Email was sent to %s", userRow.EmailAddr)
 
     // resend email to prompt for verification
-    err = sendVerifyEmail(verifyEmailTemplateParams{EmailAddr: userRow.email_addr, FirstName: userRow.first_name, LastName: userRow.last_name, Token: userRow.verify_token})
+    err = sendVerifyEmail(verifyEmailTemplateParams{EmailAddr: userRow.EmailAddr, FirstName: userRow.FirstName, LastName: userRow.LastName, Token: userRow.verify_token})
     if err != nil {
-      loginResp.ValidationResult.Message = fmt.Sprintf("Login is not permitted with unverified email address. In addition, the system failed to resend to %s", userRow.email_addr)
+      loginResp.ValidationResult.Message = fmt.Sprintf("Login is not permitted with unverified email address. In addition, the system failed to resend to %s", userRow.EmailAddr)
       glog.Errorf("%s Failure attempting to resend email: %s", localPrefix, err)
     }
 
@@ -808,9 +752,9 @@ func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginReques
   if loginUsingPassword {
     // Create a new session
     var sr = new(SessionDbRow)
-    sr.sys_user_id = userRow.sys_user_id
-    sr.ip_addr = ipAddress
-    sr.user_agent = userAgent
+    sr.SysUserId = userRow.SysUserId
+    sr.IpAddr = ipAddress
+    sr.UserAgent = userAgent
     csi, err = sr.InsertSession()
     if err != nil {
       loginResp.ValidationResult.Message = "System error prevented session token creation"
@@ -1059,17 +1003,17 @@ func getResetToken(rw http.ResponseWriter, req *http.Request) {
     return
   }
   if glog.V(2) {
-    glog.Infof("%s Created a reset token for email addess %s (sys_user_id=%s)", localPrefix, inEmailAddr, userRow.sys_user_id)
+    glog.Infof("%s Created a reset token for email addess %s (SysUserId=%s)", localPrefix, inEmailAddr, userRow.SysUserId)
   }
 
   // send the email
-  err = sendResetEmail(resetEmailTemplateParams{EmailAddr: userRow.email_addr, FirstName: userRow.first_name, LastName: userRow.last_name, Token: clearResetToken})
+  err = sendResetEmail(resetEmailTemplateParams{EmailAddr: userRow.EmailAddr, FirstName: userRow.FirstName, LastName: userRow.LastName, Token: clearResetToken})
   if err != nil {
     glog.Errorf("%s Failure attempting to send the reset email: %s", localPrefix, err)
     return
   }
   if glog.V(1) {
-    glog.Infof("%s Password reset email sent to %s %s <%s>", localPrefix, userRow.first_name, userRow.last_name, inEmailAddr)
+    glog.Infof("%s Password reset email sent to %s %s <%s>", localPrefix, userRow.FirstName, userRow.LastName, inEmailAddr)
   }
 
 }
@@ -1156,7 +1100,7 @@ func useResetToken(rw http.ResponseWriter, req *http.Request) {
   }
 
   // tokens must match
-  cryptToken, err := encryptResetToken(inResetToken, userRow.sys_user_id)
+  cryptToken, err := encryptResetToken(inResetToken, userRow.SysUserId)
   if err != nil {
     if glog.V(2) {
       glog.Infof("%s encryptResetToken err: %s", localPrefix, err)
@@ -1183,9 +1127,9 @@ func useResetToken(rw http.ResponseWriter, req *http.Request) {
 
   // Create a new session
   var sr = new(SessionDbRow)
-  sr.sys_user_id = userRow.sys_user_id
-  sr.ip_addr = suppliedIP
-  sr.user_agent = req.Header.Get("User-Agent")
+  sr.SysUserId = userRow.SysUserId
+  sr.IpAddr = suppliedIP
+  sr.UserAgent = req.Header.Get("User-Agent")
   csi, err := sr.InsertSession()
   if err != nil {
     response.ValidationResult.Message = "System error prevented session token creation"
@@ -1283,7 +1227,7 @@ func getLogin(rw http.ResponseWriter, req *http.Request) {
   }
 }
 
-// checkCredentials
+// checkCredentials looks up the user credentials and associates the login response with the CredentialsKey
 func checkCredentials(req *http.Request) {
 
   logTag := context.Get(req, RequestLogIdKey)
@@ -1342,8 +1286,8 @@ func Handler(rw http.ResponseWriter, req *http.Request) {
   router.HandleFunc("/session/user/{EmailAddr}/token/{Token}", verifyEmail).Methods("GET")
   router.HandleFunc("/session/login", doLogin).Methods("POST")
   router.HandleFunc("/session/login", getLogin).Methods("GET")
-  router.HandleFunc("/session/reset/{EmailAddr}/token/{Token}", useResetToken).Methods("GET")
   router.HandleFunc("/session/reset/{EmailAddr}", getResetToken).Methods("GET")
+  router.HandleFunc("/session/reset/{EmailAddr}/token/{Token}", useResetToken).Methods("GET")
   router.HandleFunc("/session/logout", doLogout).Methods("POST")
 
   router.ServeHTTP(rw, req)
