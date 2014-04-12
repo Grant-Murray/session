@@ -5,7 +5,6 @@ Package session provides http handlers for managing users and permitting them to
 
 Next steps TODO
     Change table to have: EmailAddr and UnverifiedEmailAddr
-    A doUser test to verify that the cache is correct after profile change
     UI test when nginx is up, but sessiond is down
     Should each service have its own postgres role? Instead of using postgres as the role. This role should have a minimal set of privileges.
 
@@ -21,10 +20,9 @@ Nice to have features
     config option that permits login with unverified email address
 
 [1] session_client
-    * cached and remote version of VerifyIdentity
-    * genericLogin would need to be a HTTPS request
-    * vDirty would need to be passed back to remote client (to notify of profile changes)
-    * logouts would also need to be sent back
+    * finds the load balancer for sessiond backends
+    * sends GET /session/login with session cookies
+    * avoid temptation to cache anything
 
 [2] super_user
     * a user who can add/change/deactivate other users in the super_user's domain[3] (requires an Authorization mechanism)

@@ -1,6 +1,7 @@
 package session
 
 import (
+  "crypto/sha512"
   "encoding/hex"
   "fmt"
   "github.com/golang/glog"
@@ -40,12 +41,22 @@ func (csi *ClearSessionId) EncryptToken() (SessionId string, err error) {
     return "", err
   }
 
-  SessionId, err = encrypt(csi.Salt, csi.SessionToken)
+  // scrypt is slow and good for passwords
+  // sha512 is faster and good for sessions
+  saltBytes, err := hex.DecodeString(csi.Salt)
   if err != nil {
-    glog.Errorf("Encryption failed: %s", err)
-    err = fmt.Errorf("Encryption failed: %s", err)
+    glog.Errorf("Undecodable salt (%s)", csi.Salt)
     return "", err
   }
+
+  combined := make([]byte, 64+32+36)
+  _ = copy(combined[0:64], Conf.ServerKey)
+  _ = copy(combined[64:96], saltBytes)
+  _ = copy(combined[96:], []byte(csi.SessionToken))
+
+  sum512 := sha512.Sum512(combined)
+
+  SessionId = hex.EncodeToString(sum512[:])
 
   return SessionId, nil
 }

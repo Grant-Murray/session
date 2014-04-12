@@ -490,9 +490,6 @@ func doUser(rw http.ResponseWriter, req *http.Request) {
       uResp.ValidationResult.Message = fmt.Sprintf("%s Database error updating user: %s", localPrefix, err)
       return
     }
-
-    // cache entry becomes dirty when profile data is changed
-    vDirty[givenSysUserId] = true
   }
 
   if emailChanged {
@@ -632,7 +629,7 @@ func (loginResp *LoginResponse) setUserData(userRow UserDbRow) {
 }
 
 // genericLogin is called as a web service (doLogin) and as a package func (Verify)
-// genericLogin checks the database for a valid session (cache has already been checked)
+// genericLogin checks the database for a valid session
 func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginRequest, loginResp *LoginResponse) {
 
   if loginResp == nil {
@@ -793,14 +790,6 @@ func genericLogin(localPrefix, ipAddress, userAgent string, loginReq LoginReques
 
 }
 
-type verifyCacheEntry struct {
-  response   *LoginResponse
-  staleAfter time.Time
-}
-
-var vCache map[string]verifyCacheEntry = make(map[string]verifyCacheEntry, 1000)
-var vDirty map[string]bool = make(map[string]bool, 1000)
-
 // VerifyIdentity is used by clients to check if the supplied sess is valid thus confirming the identity of userId, the session is only valid if the ipAddress and userAgent is the same as those in the database
 func VerifyIdentity(logTag, userId string, sess ClearSessionId, ipAddress, userAgent string) (resp *LoginResponse) {
 
@@ -816,33 +805,6 @@ func VerifyIdentity(logTag, userId string, sess ClearSessionId, ipAddress, userA
     glog.Infof("%s handling begins", localPrefix)
   }
 
-  // clear out all stale and dirty(modified) cache entries
-  for k, v := range vCache {
-    if vDirty[v.response.SysUserId] {
-      delete(vDirty, v.response.SysUserId)
-      delete(vCache, k)
-    } else if v.staleAfter.Before(time.Now()) {
-      delete(vCache, k)
-    }
-  }
-
-  var cacheKey string = sess.SessionToken + sess.Salt
-
-  // check cache
-  entry := vCache[cacheKey]
-
-  if entry.response != nil {
-    // return the cached response since it is not stale
-    if glog.V(2) {
-      glog.Infof("%s cache hit", localPrefix)
-    }
-    return entry.response
-  } else {
-    if glog.V(2) {
-      glog.Infof("%s cache miss", localPrefix)
-    }
-  }
-
   req := LoginRequest{UserIdentifier: userId, SessionToken: sess.SessionToken, Salt: sess.Salt}
   resp = new(LoginResponse)
   genericLogin(localPrefix, ipAddress, userAgent, req, resp)
@@ -855,24 +817,8 @@ func VerifyIdentity(logTag, userId string, sess ClearSessionId, ipAddress, userA
     return resp
   }
 
-  if resp.ValidationResult.Status != StatusOK {
-    // do not cache the authentication failures
-    if glog.V(2) {
-      glog.Infof("%s: %s", localPrefix, resp.ValidationResult.Message)
-    }
-    return resp
-  }
-
-  // cache the response but not longer than secondsToLive
-  var secondsToLive int = 60
-  if resp.SessionTTL < secondsToLive {
-    secondsToLive = resp.SessionTTL
-  }
-
-  vCache[cacheKey] = verifyCacheEntry{staleAfter: time.Now().Add(time.Duration(secondsToLive) * time.Second),
-    response: resp}
   if glog.V(2) {
-    glog.Infof("%s: cached response and finished: %s", localPrefix, resp.ValidationResult.Message)
+    glog.Infof("%s: %s", localPrefix, resp.ValidationResult.Message)
   }
 
   return resp
@@ -1183,9 +1129,6 @@ func doLogout(rw http.ResponseWriter, req *http.Request) {
   csi := new(ClearSessionId)
   csi.SessionToken = logoutReq.SessionToken
   csi.Salt = logoutReq.Salt
-
-  // remove session from cache
-  delete(vCache, logoutReq.SessionToken+logoutReq.Salt)
 
   rows, err := DeleteSession(csi)
   if err != nil {

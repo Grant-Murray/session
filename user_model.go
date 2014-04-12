@@ -71,7 +71,7 @@ func encrypt(salt string, clearstr string) (crypt string, err error) {
   _ = copy(combined[0:64], Conf.ServerKey)
   _ = copy(combined[64:], saltBytes)
 
-  cryptBytes, err := scrypt.Key([]byte(clearstr), combined, 65536, 8, 1, 64)
+  cryptBytes, err := scrypt.Key([]byte(clearstr), combined, 16384, 8, 1, 64)
   if err != nil {
     glog.Errorf("Failure in execution of scrypt: %s", err)
   }

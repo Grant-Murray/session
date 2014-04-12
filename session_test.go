@@ -206,20 +206,7 @@ func Benchmark_Login(b *testing.B) {
 
 func Benchmark_VerifyIdentity(b *testing.B) {
 
-  b.N = 50
-  for i := 0; i < b.N; i++ {
-    r := bmarkSessions[i]
-
-    vResp := VerifyIdentity(fmt.Sprintf("%06d", i), r.SysUserId, ClearSessionId{SessionToken: r.SessionToken, Salt: r.Salt}, SavedIpAddress, SavedUserAgent)
-    if vResp.ValidationResult.Status != StatusOK {
-      b.Fatalf("Verify #%d failed: %s", i, vResp.ValidationResult.Message)
-    }
-  }
-}
-
-func Benchmark_VerifyIdentity_cached(b *testing.B) {
-
-  b.N = 5000
+  b.N = 1000
   for i := 0; i < b.N; i++ {
     r := bmarkSessions[i%50]
 
@@ -991,7 +978,7 @@ func loginCaseFactory(index int) *loginCase {
   case 9:
     return &loginCase{"Salt is missing", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"6ba7b814-9dad-11d1-80b4-00c04fd430c8", "Salt":""}`, SavedRow.SysUserId), Result{StatusInvalid, "Authentication failed", "", "SessionToken", "Invalid data"}, false, "Error during SelectValidSession call: Salt is missing"}
   case 10:
-    return &loginCase{"Salt is unparsable", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"6ba7b814-9dad-11d1-80b4-00c04fd430c8", "Salt":"wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-"}`, SavedRow.SysUserId), Result{StatusInvalid, "Authentication failed", "", "SessionToken", "Invalid data"}, false, "Error during SelectValidSession call: Encryption failed: encoding/hex: invalid byte: U+0077"}
+    return &loginCase{"Salt is unparsable", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"6ba7b814-9dad-11d1-80b4-00c04fd430c8", "Salt":"wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-wtf-"}`, SavedRow.SysUserId), Result{StatusInvalid, "Authentication failed", "", "SessionToken", "Invalid data"}, false, "Error during SelectValidSession call: encoding/hex: invalid byte: U+0077"}
   case 11:
     return &loginCase{"Salt is too long", fmt.Sprintf(`{"UserIdentifier":"%s", "SessionToken":"6ba7b814-9dad-11d1-80b4-00c04fd430c8", "Salt":"00c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c800c04fd430c8"}`, SavedRow.SysUserId), Result{StatusInvalid, "Authentication failed", "", "SessionToken", "Invalid data"}, false, "Error during SelectValidSession call: Salt must be 32 bytes but was 132 bytes"}
   case 12:
@@ -1148,7 +1135,7 @@ func mustExistInLog(prefix string, expectStr string, t *testing.T) {
   }
 
   if !found {
-    t.Fatalf("Failed to find in logfile (%s && &s)", prefix, expectStr)
+    t.Fatalf("Failed to find in logfile (%s && %s)", prefix, expectStr)
   }
 
 }
@@ -1203,7 +1190,7 @@ func Test_Logout_table(t *testing.T) {
     {"Non-uuid session token", `{ "SessionToken":"doh" }`, "Invalid logout request received: Failed to encrypt SessionToken: SessionToken (doh) is not a UUID"},
     {"Missing Salt", `{ "SessionToken":"6ba7b810-9dad-11d1-80b4-00c04fd430c8" }`, "Invalid logout request received: Failed to encrypt SessionToken: Salt is missing"},
     {"Blank Salt", `{ "SessionToken":"6ba7b810-9dad-11d1-80b4-00c04fd430c8", "Salt":"" }`, "Invalid logout request received: Failed to encrypt SessionToken: Salt is missing"},
-    {"Unparsable Salt", `{ "SessionToken":"6ba7b810-9dad-11d1-80b4-00c04fd430c8", "Salt":"doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!" }`, "Invalid logout request received: Failed to encrypt SessionToken: Encryption failed: encoding/hex: invalid byte: U+006F"},
+    {"Unparsable Salt", `{ "SessionToken":"6ba7b810-9dad-11d1-80b4-00c04fd430c8", "Salt":"doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!doh!" }`, "Invalid logout request received: Failed to encrypt SessionToken: encoding/hex: invalid byte: U+006F"},
     {"Incorrect length Salt", `{ "SessionToken":"6ba7b810-9dad-11d1-80b4-00c04fd430c8", "Salt":"abcd" }`, "Invalid logout request received: Failed to encrypt SessionToken: Salt must be 32 bytes but was 2 bytes"},
     {"Not in database", `{ "SessionToken":"6ba7b810-9dad-11d1-80b4-00c04fd430c8", "Salt":"abcdabcdabcdabcdabcdabcdabcdabcdabcd00112233445566778899aabbccdd" }`, "No such session 6ba7b810 to delete"},
     {"Right session token, wrong Salt", fmt.Sprintf(`{ "SessionToken":"%s", "Salt":"abcdabcdabcdabcdabcdabcdabcdabcdabcd00112233445566778899aabbccdd" }`, SavedSessionToken),
