@@ -10,6 +10,7 @@ import (
   "bufio"
   "crypto/tls"
   "encoding/json"
+  "flag"
   "fmt"
   uuid "github.com/nu7hatch/gouuid"
   "io/ioutil"
@@ -32,10 +33,12 @@ var (
   SavedUserAgent     string = "Agent007-Tester"
   SavedCookieJar     http.CookieJar
   SavedCookieMap     map[string]*http.Cookie // built after calling SavedCookieJar.Cookies(url)
+
+  sessiondAddr string = "plog.org:8004"
 )
 
 const (
-  LOGFILENAME = "/tmp/sessiond.glog/sessiond.INFO"
+  LOGDIR = "/tmp/sessiond.glog"
 )
 
 func initClient() *http.Client {
@@ -50,6 +53,10 @@ func initClient() *http.Client {
 }
 
 func Test_Config(t *testing.T) {
+
+  flag.Set("instance", "sessiond-A")
+  LoadConfig()
+
   if Conf.Smtp.Host != "test.mailbot.net" {
     t.Fatalf("FAIL: Smtp.Host had an unexpected value")
   }
@@ -76,12 +83,11 @@ func Test_Config(t *testing.T) {
 func doTestUser(t *testing.T, SysUserId string, body string) (auResp *UserResponse, err error) {
   client := initClient()
   auResp = new(UserResponse)
-  addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
   verb := "PUT"
-  srvURL := fmt.Sprintf("https://%s/session/users", addr)
+  srvURL := fmt.Sprintf("https://%s/session/users", sessiondAddr)
   if SysUserId != "" {
     verb = "POST"
-    srvURL = fmt.Sprintf("https://%s/session/user/%s", addr, SysUserId)
+    srvURL = fmt.Sprintf("https://%s/session/user/%s", sessiondAddr, SysUserId)
   }
 
   c1 := strings.NewReader(body)
@@ -120,9 +126,11 @@ var bmarkSessions []*LoginResponse
 
 func Benchmark_Add_User(b *testing.B) {
 
+  flag.Set("instance", "sessiond-A")
+  LoadConfig()
+
   client := initClient()
-  addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
-  url := fmt.Sprintf("https://%s/session/users", addr)
+  url := fmt.Sprintf("https://%s/session/users", sessiondAddr)
   b.N = 50
 
   for i := 0; i < b.N; i++ {
@@ -166,8 +174,7 @@ func Benchmark_email_verification(b *testing.B) {
 func Benchmark_Login(b *testing.B) {
 
   client := initClient()
-  addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
-  url := fmt.Sprintf("https://%s/session/login", addr)
+  url := fmt.Sprintf("https://%s/session/login", sessiondAddr)
   b.N = 50
   bmarkSessions = make([]*LoginResponse, b.N)
 
@@ -214,30 +221,6 @@ func Benchmark_VerifyIdentity(b *testing.B) {
     if vResp.ValidationResult.Status != StatusOK {
       b.Fatalf("Verify #%d failed: %s", i, vResp.ValidationResult.Message)
     }
-  }
-}
-
-func checkLoggedErrors(SystemRef string, t *testing.T) {
-  // look for absence err log messages
-
-  logf, err := os.Open(LOGFILENAME)
-  if err != nil {
-    t.Fatalf("Log file %s could not be opened: %s", LOGFILENAME, err)
-  }
-  defer logf.Close()
-
-  scanner := bufio.NewScanner(logf)
-  for scanner.Scan() {
-    line := scanner.Text()
-    if strings.Contains(line, SystemRef) {
-      if strings.Index(line, "E") == 0 {
-        t.Fatalf("Error found in logfile: %s", line)
-        break
-      }
-    }
-  }
-  if err := scanner.Err(); err != nil {
-    t.Fatalf("Error while reading logfile: %s", err)
   }
 }
 
@@ -304,8 +287,7 @@ func compareBoolColumn(t *testing.T, colName string, actual bool, expected bool)
 func verifyEmailTest(em string, tok string, t *testing.T) (vr *VerifyResponse, err error) {
   client := initClient()
 
-  addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
-  req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/session/user/%s/token/%s", addr, em, tok), nil)
+  req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/session/user/%s/token/%s", sessiondAddr, em, tok), nil)
   if err != nil {
     t.Fatalf("Failed to create a request: %s", err)
     return vr, err
@@ -332,8 +314,7 @@ func resetEmailTest(em, tok string, t *testing.T) (lr *LoginResponse, err error)
   client := initClient()
   client.Jar = SavedCookieJar
 
-  addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
-  urlStr := fmt.Sprintf("https://%s/session/reset/%s/token/%s", addr, em, tok)
+  urlStr := fmt.Sprintf("https://%s/session/reset/%s/token/%s", sessiondAddr, em, tok)
 
   req, err := http.NewRequest("GET", urlStr, nil)
   if err != nil {
@@ -350,7 +331,7 @@ func resetEmailTest(em, tok string, t *testing.T) (lr *LoginResponse, err error)
   defer resp.Body.Close()
 
   // load SavedCookieMap
-  u, err := url.Parse(fmt.Sprintf("https://%s/", addr))
+  u, err := url.Parse(fmt.Sprintf("https://%s/", sessiondAddr))
   if err != nil {
     t.Fatalf("Could not parse url: %s", err)
   }
@@ -893,8 +874,7 @@ func doTestLogin(t *testing.T, body string) (r *LoginResponse, err error) {
 
   c1 := strings.NewReader(body)
 
-  addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
-  req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/session/login", addr), c1)
+  req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/session/login", sessiondAddr), c1)
   req.Header.Set("User-Agent", SavedUserAgent)
   if err != nil {
     t.Fatalf("Failed to create a request: %s", err)
@@ -912,7 +892,7 @@ func doTestLogin(t *testing.T, body string) (r *LoginResponse, err error) {
     t.Fatalf("Cookiejar is broken: %s", err)
   }
 
-  u, err := url.Parse(fmt.Sprintf("https://%s/", addr))
+  u, err := url.Parse(fmt.Sprintf("https://%s/", sessiondAddr))
   if err != nil {
     t.Fatalf("Could not parse url: %s", err)
   }
@@ -1066,7 +1046,7 @@ func doLoginCase(cur *loginCase, t *testing.T) {
     }
   }
 
-  mustExistInLog(r.ValidationResult.SystemRef, cur.expectLogMsg, t)
+  mustExistInLogDir(r.ValidationResult.SystemRef, cur.expectLogMsg, t)
 }
 
 func Test_Login_table(t *testing.T) {
@@ -1111,33 +1091,92 @@ func Test_Login_table(t *testing.T) {
   }
 }
 
-// mustExistInLog finds lines in the logfile containing both prefix and expectStr
-// if it is not found the test is failed
-func mustExistInLog(prefix string, expectStr string, t *testing.T) {
+// look for absence of err log messages
+func checkErrorInLogFile(SystemRef string, t *testing.T, filename string) {
 
-  logf, err := os.Open(LOGFILENAME)
+  logf, err := os.Open(filename)
   if err != nil {
-    t.Fatalf("Log file %s could not be opened: %s", LOGFILENAME, err)
+    t.Fatalf("Log file %s could not be opened: %s", filename, err)
   }
   defer logf.Close()
 
-  found := false
+  scanner := bufio.NewScanner(logf)
+  for scanner.Scan() {
+    line := scanner.Text()
+    if strings.Contains(line, SystemRef) {
+      if strings.Index(line, "E") == 0 {
+        t.Fatalf("Error found in logfile: %s", line)
+        break
+      }
+    }
+  }
+  if err := scanner.Err(); err != nil {
+    t.Fatalf("Error while reading logfile: %s", err)
+  }
+}
+
+// multiple logfiles will be checked in a directory (not recursive)
+// symlinks etc are skipped
+// if any ERROR message is found the test is failed
+func checkLoggedErrors(SystemRef string, t *testing.T) {
+
+  entries, err := ioutil.ReadDir(LOGDIR)
+  if err != nil {
+    t.Fatalf("Directory containg log files (%s) could not be read: %s", LOGDIR, err)
+  }
+
+  for _, e := range entries {
+    if e.Mode().IsRegular() {
+      checkErrorInLogFile(SystemRef, t, fmt.Sprintf("%s/%s", LOGDIR, e.Name()))
+    }
+  }
+}
+
+// foundInLogFile finds lines in the logfile containing both prefix and expectStr
+func foundInLogFile(prefix string, expectStr string, t *testing.T, filename string) bool {
+
+  logf, err := os.Open(filename)
+  if err != nil {
+    t.Fatalf("Log file %s could not be opened: %s", filename, err)
+  }
+  defer logf.Close()
+
   scanner := bufio.NewScanner(logf)
   for scanner.Scan() {
     line := scanner.Text()
     if strings.Contains(line, prefix) && strings.Contains(line, expectStr) {
-      found = true
-      break
+      return true // found
     }
   }
   if err := scanner.Err(); err != nil {
     t.Fatalf("Error while reading logfile: %s", err)
   }
 
-  if !found {
-    t.Fatalf("Failed to find in logfile (%s && %s)", prefix, expectStr)
+  return false // not found in this file
+}
+
+// multiple logfiles will be checked in a directory (not recursive)
+// symlinks etc are skipped
+// if it is not found the test is failed
+func mustExistInLogDir(prefix string, expectStr string, t *testing.T) {
+
+  var fcount = 0
+
+  entries, err := ioutil.ReadDir(LOGDIR)
+  if err != nil {
+    t.Fatalf("Directory containg log files (%s) could not be read: %s", LOGDIR, err)
   }
 
+  for _, e := range entries {
+    if e.Mode().IsRegular() {
+      fcount++
+      if foundInLogFile(prefix, expectStr, t, fmt.Sprintf("%s/%s", LOGDIR, e.Name())) {
+        return
+      }
+    }
+  }
+
+  t.Fatalf("Failed to find in %d logfiles that were searched (%s && %s)", fcount, prefix, expectStr)
 }
 
 type logoutCase struct {
@@ -1152,8 +1191,7 @@ func doLogoutCase(cur *logoutCase, t *testing.T) {
 
   c1 := strings.NewReader(cur.req)
 
-  addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
-  req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/session/logout", addr), c1)
+  req, err := http.NewRequest("POST", fmt.Sprintf("https://%s/session/logout", sessiondAddr), c1)
   if err != nil {
     t.Fatalf("Failed to create a request: %s", err)
   }
@@ -1175,7 +1213,7 @@ func doLogoutCase(cur *logoutCase, t *testing.T) {
     t.Fatalf("Error while decoding response body: %s", err)
   }
 
-  mustExistInLog(r.SystemRef, cur.expect, t)
+  mustExistInLogDir(r.SystemRef, cur.expect, t)
 }
 
 func Test_Logout_table(t *testing.T) {
@@ -1216,8 +1254,7 @@ func doResetPassword(t *testing.T, inEmailAddr, expectLogMsg string) {
     SystemRef string
   })
 
-  addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
-  req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/session/reset/%s", addr, inEmailAddr), nil)
+  req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/session/reset/%s", sessiondAddr, inEmailAddr), nil)
   req.Header.Set("User-Agent", SavedUserAgent)
   if err != nil {
     t.Fatalf("Failed to create a request: %s", err)
@@ -1228,7 +1265,7 @@ func doResetPassword(t *testing.T, inEmailAddr, expectLogMsg string) {
     t.Fatalf("client request failed: %s", err)
   }
 
-  _, err = url.Parse(fmt.Sprintf("https://%s/", addr))
+  _, err = url.Parse(fmt.Sprintf("https://%s/", sessiondAddr))
   if err != nil {
     t.Fatalf("Could not parse url: %s", err)
   }
@@ -1240,7 +1277,7 @@ func doResetPassword(t *testing.T, inEmailAddr, expectLogMsg string) {
     t.Fatalf("Error while decoding response body: %s", err)
   }
 
-  mustExistInLog(r.SystemRef, expectLogMsg, t)
+  mustExistInLogDir(r.SystemRef, expectLogMsg, t)
 }
 
 func useResetTokenInEmail(t *testing.T, inEmailAddr string) *LoginResponse {
@@ -1269,8 +1306,7 @@ func useResetTokenInEmail(t *testing.T, inEmailAddr string) *LoginResponse {
 func Test_doReset_blank_EmailAddress(t *testing.T) {
 
   client := initClient()
-  addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
-  req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/session/reset/", addr), nil)
+  req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/session/reset/", sessiondAddr), nil)
   req.Header.Set("User-Agent", SavedUserAgent)
   if err != nil {
     t.Fatalf("Failed to create a request: %s", err)
@@ -1290,8 +1326,7 @@ func Test_doReset_blank_EmailAddress(t *testing.T) {
 func Test_useReset_blank_token(t *testing.T) {
 
   client := initClient()
-  addr := fmt.Sprintf("%s:%d", Conf.HttpsHost, Conf.HttpsPort)
-  req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/session/reset/someone@somewhere.net/token/", addr), nil)
+  req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/session/reset/someone@somewhere.net/token/", sessiondAddr), nil)
   req.Header.Set("User-Agent", SavedUserAgent)
   if err != nil {
     t.Fatalf("Failed to create a request: %s", err)
@@ -1397,7 +1432,7 @@ func Test_useReset_success(t *testing.T) {
   }
 
   expectResult(Result{Status: StatusOK, Message: "Reset request is valid", PropInError: "", PropErrorMsg: ""}, lr.ValidationResult, t)
-  mustExistInLog(lr.ValidationResult.SystemRef, fmt.Sprintf("Reset request is valid for email %s", SavedRow.EmailAddr), t)
+  mustExistInLogDir(lr.ValidationResult.SystemRef, fmt.Sprintf("Reset request is valid for email %s", SavedRow.EmailAddr), t)
 
   // check fields updated: reset_token, EmailVerified, verify_token
   ur, err := SelectUser(SavedRow.EmailAddr)
@@ -1438,7 +1473,7 @@ func Test_useReset_token_is_not_in_db(t *testing.T) {
   }
 
   expectResult(Result{Status: StatusInvalid, Message: "Reset failed", PropInError: "", PropErrorMsg: ""}, lr.ValidationResult, t)
-  mustExistInLog(lr.ValidationResult.SystemRef, "No reset token in database", t)
+  mustExistInLogDir(lr.ValidationResult.SystemRef, "No reset token in database", t)
 
 }
 
@@ -1454,7 +1489,7 @@ func Test_useReset_on_expired_reset(t *testing.T) {
   lr := useResetTokenInEmail(t, SavedRow.EmailAddr)
 
   expectResult(Result{Status: StatusInvalid, Message: "Reset failed", PropInError: "", PropErrorMsg: ""}, lr.ValidationResult, t)
-  mustExistInLog(lr.ValidationResult.SystemRef, "Reset token is expired", t)
+  mustExistInLogDir(lr.ValidationResult.SystemRef, "Reset token is expired", t)
 }
 
 func Test_doReset_login_disallowed(t *testing.T) {
@@ -1488,7 +1523,7 @@ func Test_useReset_login_disallowed(t *testing.T) {
   lr := useResetTokenInEmail(t, SavedRow.EmailAddr)
 
   expectResult(Result{Status: StatusInvalid, Message: "Reset failed", PropInError: "", PropErrorMsg: ""}, lr.ValidationResult, t)
-  mustExistInLog(lr.ValidationResult.SystemRef, "login_allowed is false", t)
+  mustExistInLogDir(lr.ValidationResult.SystemRef, "login_allowed is false", t)
 
   err = SavedRow.setLoginAllowed(true)
   if err != nil {

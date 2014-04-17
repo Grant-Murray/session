@@ -35,13 +35,17 @@ CREATE TABLE IF NOT EXISTS session.config (
   SmtpAuthUsername varchar(256),
   SmtpAuthPassword varchar(256),
   SmtpAuthHost varchar(256),
-  HttpsHost varchar(256),
-  HttpsPort integer,
-  HttpsKey text,
-  HttpsCert text,
   VerifyTemplate text,
   ResetTemplate text,
   PasswordResetExpiresDuration integer
+);
+
+CREATE TABLE IF NOT EXISTS session.instconfig (
+  InstanceId varchar(256) PRIMARY KEY,
+  HttpsHost varchar(256),
+  HttpsPort integer,
+  HttpsKey text,
+  HttpsCert text
 );
 
 INSERT INTO session.config DEFAULT VALUES;

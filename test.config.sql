@@ -44,11 +44,18 @@ https://plog.org:8004/#/verify/{{.EmailAddr}}/token/{{.Token}}
 If you did not register on the plog, then just delete this email.
 
 Regards, Grant
-btw Do not reply to this email address, use my regular one.',
+btw Do not reply to this email address, use my regular one.';
 
-HttpsHost = 'plog.org', /* needs to be in /etc/hosts */
-HttpsPort = '10443',
-HttpsKey = '-----BEGIN PRIVATE KEY-----
+INSERT INTO session.instconfig (InstanceId, HttpsHost, HttpsPort) VALUES
+('sessiond-A', 'plog.org', '10001'),
+('sessiond-B', 'plog.org', '10002'),
+('sessiond-C', 'plog.org', '10003'),
+('sessiond-D', 'plog.org', '10004'),
+('sessiond-E', 'plog.org', '10005');
+
+UPDATE session.instconfig SET
+HttpsKey = 
+'-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDV6C4tnQLfrolm
 azcdSiGCWGiwtVc+gIoT6gsFPIK+oFdLMHUIFAGhoqMiP5TRHiIJGsW8aUwGpP62
 +OBNtHlhbOgzxPavqDr3b4kAF9hCXQt1lT8NnFOmmpGk1vueqsZSsZkJdCUg1CnV
@@ -76,7 +83,8 @@ zfNGzlNCASv6tTbrtCqMva9tc1lSBkMNP6SpK1O6Sm1hXNzOu1urI4HPR8Du3218
 mlIl4ymFTzIf4xU/u2MLFgt/6pTOKB6mM2sWVhVeOiaSguZYuamuNskvu41eJWVS
 eyqrEtky5MIoSpwchlIwVuw=
 -----END PRIVATE KEY-----',
-  HttpsCert = '-----BEGIN CERTIFICATE-----
+HttpsCert =
+'-----BEGIN CERTIFICATE-----
 MIIDTzCCArigAwIBAgIBAjANBgkqhkiG9w0BAQUFADBsMQswCQYDVQQGEwJVUzET
 MBEGA1UECAwKQ2FsaWZvcm5pYTERMA8GA1UECgwIR0xNIFRlc3QxDzANBgNVBAMM
 BkdMTSBDQTEkMCIGCSqGSIb3DQEJARYVZW1haWxAZ3JhbnRtdXJyYXkuY29tMB4X
@@ -96,4 +104,4 @@ gYEARUhKn0LO2cruizriNGiCKpISs8plY3V1ZEkOAqA6aM9X8dH5ibPanQEeXWCl
 ZzY6IFE0QZD4VPgXe4omTNu5wWmehhQuR+my4uefe1NcpdsxoqPGTZFhyxcoiM4p
 JRLwW7yf6ZZEBOb83X25Y7ih2pL6dZ58x9+ElSLKDrET/RM=
 -----END CERTIFICATE-----'
-;
+WHERE HttpsHost = 'plog.org';

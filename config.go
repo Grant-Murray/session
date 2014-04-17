@@ -4,6 +4,7 @@ import (
   "bufio"
   "database/sql"
   "encoding/hex"
+  "flag"
   "fmt"
   "github.com/Grant-Murray/mailbot"
   "github.com/golang/glog"
@@ -37,18 +38,6 @@ type Config struct {
   // SessionMaxLife in number of seconds, session forced to expire
   SessionMaxLife int
 
-  // Certificates and key that are needed to start an https server
-  // (see create-test-certs.sh for some hints on loading these)
-  HttpsKey  []byte
-  HttpsCert []byte
-
-  // HttpsHost is the address the server will listen on
-  // for example: "plog.org"
-  HttpsHost string
-
-  // HttpsPort is the port that the server will listen on
-  HttpsPort int
-
   // DatabaseHandle is here as a convenience since we have it and
   // it is deriviative of DatabaseSource and the only thing to do with
   // DatabaseSource is to open a connection
@@ -67,6 +56,21 @@ type Config struct {
 
   // PasswordResetExpirationDuration is the number of seconds that a reset token will be valid for
   PasswordResetExpiresDuration int
+
+  // *** instance specific ***
+  InstanceId string
+
+  // Certificates and key that are needed to start an https server
+  // (see create-test-certs.sh for some hints on loading these)
+  HttpsKey  []byte
+  HttpsCert []byte
+
+  // HttpsHost is the address the server will listen on
+  // for example: "plog.org"
+  HttpsHost string
+
+  // HttpsPort is the port that the server will listen on
+  HttpsPort int
 }
 
 // Conf is a package global so that it is accessible everywhere.
@@ -108,12 +112,13 @@ func (c *Config) bootstrap() {
 
 }
 
-// reads configuration values from a table and loads them into the global Conf
 func init() {
   var err error
 
   Conf = new(Config)
   Conf.bootstrap()
+
+  flag.StringVar(&Conf.InstanceId, "instance", "None", "An identifier for the instance, used to fetch the instance specific configuration")
 
   if len(Conf.ServerKey) != 64 {
     panic(fmt.Sprintf("Serverkey needs to be 64 bytes long exactly, it was only %d bytes", len(Conf.ServerKey)))
@@ -123,24 +128,66 @@ func init() {
   if err != nil {
     panic(err)
   }
-  rows, err := Conf.DatabaseHandle.Query("SELECT SessionTimeout, SessionMaxLife, HttpsKey, HttpsCert, HttpsHost, HttpsPort, SmtpServerHost, SmtpServerPort, SmtpFrom, SmtpAuthUsername, SmtpAuthPassword, VerifyTemplate, ResetTemplate, PasswordResetExpiresDuration FROM session.config")
+}
+
+// Load reads configuration values from database tables and loads them into the global variable Conf.
+func LoadConfig() {
+  var err error
+
+  // LoadConfig would ideally be done in init() but since loading depends on flag values it needs to be done after flag.Parse()
+  if len(Conf.InstanceId) == 0 || Conf.InstanceId == "None" {
+    panic("Command line parameter `instance` is missing, cannot complete config")
+  }
+
+  var iloaded bool = false
+  rows, err := Conf.DatabaseHandle.Query("SELECT SessionTimeout, SessionMaxLife, SmtpServerHost, SmtpServerPort, SmtpFrom, SmtpAuthUsername, SmtpAuthPassword, VerifyTemplate, ResetTemplate, PasswordResetExpiresDuration FROM session.config")
   if err != nil {
     panic(err)
   }
 
   for rows.Next() {
     if err := rows.Scan(&Conf.SessionTimeout, &Conf.SessionMaxLife,
-      &Conf.HttpsKey, &Conf.HttpsCert, &Conf.HttpsHost, &Conf.HttpsPort,
       &Conf.Smtp.Host, &Conf.Smtp.Port, &Conf.Smtp.EmailFrom, &Conf.Smtp.User, &Conf.Smtp.Password,
       &Conf.VerifyTemplate, &Conf.ResetTemplate, &Conf.PasswordResetExpiresDuration); err != nil {
       panic(err)
     }
+    iloaded = true
   }
   if err := rows.Err(); err != nil {
     panic(err)
   }
 
-  if glog.V(1) {
-    glog.Info("Configuration loaded from database")
+  if !iloaded {
+    panic("Configuration failed to load")
   }
+
+  if glog.V(1) {
+    glog.Info("Common configuration loaded from database")
+  }
+
+  iloaded = false
+  rows, err = Conf.DatabaseHandle.Query("SELECT HttpsKey, HttpsCert, HttpsHost, HttpsPort FROM session.instconfig WHERE InstanceId = $1", Conf.InstanceId)
+  if err != nil {
+    panic(fmt.Sprintf("instance:%s, err:%s", Conf.InstanceId, err))
+  }
+
+  for rows.Next() {
+    if err := rows.Scan(&Conf.HttpsKey, &Conf.HttpsCert, &Conf.HttpsHost, &Conf.HttpsPort); err != nil {
+      panic(err)
+    }
+    iloaded = true
+  }
+  if err := rows.Err(); err != nil {
+    panic(err)
+  }
+
+  if !iloaded {
+    panic(fmt.Sprintf("Missing instance configuration for %s", Conf.InstanceId))
+  }
+
+  if glog.V(1) {
+    glog.Info(fmt.Sprintf("Configuration for instance %s (%s:%d) loaded from database", Conf.InstanceId, Conf.HttpsHost, Conf.HttpsPort))
+  }
+
+  glog.Flush()
 }

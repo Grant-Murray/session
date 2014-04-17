@@ -1,4 +1,5 @@
 #!/bin/bash
+# for TEST only, insecure script
 
 TYP='test'
 #TYP='bench'
@@ -36,6 +37,8 @@ fi
 PSQL="psql --username=postgres --dbname=sessdb"
 echo 'select * from session.user'    | $PSQL --expanded > /tmp/sessdb.session.user
 echo 'select * from session.session' | $PSQL --expanded > /tmp/sessdb.session.session
+echo 'select * from session.config' | $PSQL --expanded > /tmp/sessdb.session.config
+echo 'select * from session.instconfig' | $PSQL --expanded > /tmp/sessdb.session.instconfig
 
 # clean up
 killall sessiond
