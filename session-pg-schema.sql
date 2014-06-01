@@ -1,3 +1,5 @@
+CREATE ROLE sessionr WITH LOGIN ENCRYPTED PASSWORD 'big-secret' VALID UNTIL '2014-12-31' CONNECTION LIMIT 100 NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION ;
+
 CREATE SCHEMA IF NOT EXISTS session;
 
 CREATE TABLE IF NOT EXISTS session.user (
@@ -47,5 +49,21 @@ CREATE TABLE IF NOT EXISTS session.instconfig (
   HttpsKey text,
   HttpsCert text
 );
+
+REVOKE ALL ON SCHEMA session FROM PUBLIC;
+GRANT USAGE ON SCHEMA session to sessionr;
+
+REVOKE ALL ON TABLE session.user FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE ON TABLE session.user TO sessionr; /* set login_allowed = false instead of DELETE */
+
+REVOKE ALL ON TABLE session.session FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE session.session TO sessionr;
+
+/* superuser manages the config */
+REVOKE ALL ON TABLE session.config FROM PUBLIC;
+GRANT SELECT ON TABLE session.config TO sessionr;
+
+REVOKE ALL ON TABLE session.instconfig FROM PUBLIC;
+GRANT SELECT ON TABLE session.instconfig TO sessionr;
 
 INSERT INTO session.config DEFAULT VALUES;

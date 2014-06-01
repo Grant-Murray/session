@@ -298,7 +298,7 @@ Example:
 
     { "SystemRef": "getResetToken-378242:" }
 
-## Using a Reset Token {#UseResetToken}
+## Use a Reset Token {#UseResetToken}
 
 Using a reset token, is another way of logging in. The reset token can only be used once. After logging in this way, it is expected that the client will present the user with the opportunity to change her password.
 
@@ -369,7 +369,7 @@ The routing of the HTTP request to the correct handler depends on the URL and th
 
 ## Authentication of Request using a SessionToken {#SessionCookies}
 
-Requests requiring an authenticated user, send an HTTP cookie header containing session info. The session info was originally set in the [authentication response](#LoginResponse) after logging-in using a password or using a reset token.
+All requests requiring an authenticated user, send an HTTP cookie header containing session info. The session info was originally set in the [authentication response](#LoginResponse) after logging-in using a password or using a reset token.
 
 
 Example:
@@ -444,10 +444,30 @@ PropErrorMsg
 
 Nginx can be used as a router and load balancer to scale performance horizontally. This means that there can be multiple instances of a service running (e.g. sessiond). This implies that each instance needs its instance specific config and shared config info. It also implies that any caching solution cannot assume a single instance, which is why the caching that was tries was removed.
 
+# Installation
 
+## Postgres Database
 
+* The latest version (9.3.4) was used and tested during development.
+* A Postgres expert professional should install, secure and configure the cluster.
+* A single role (sessionr) should be given the minimal priveleges needed, and this role should be required to authenticate rigorously at connection time. (See session-pg-schema.sql for the minimal priveleges.)
+* Create the database objects as described in session-pg-schema.sql
+* Save the database source string needed by the Go driver, something like: "user=sessionr password='big secret' dbname=sessdb host=localhost port=5432 sslmode=disable"
+* Configure the sessiond cluster by updating and inserting rows into session.config and session.instconfig
 
+## Nginx (reverse proxy / load balancer)
+* The latest version (1.4.7) was used and tested during development.
+* An nginx expert professional should install, secure and configure nginx.
+* **TODO** more details on the proxy rules, ssl, and load balancing needed.
 
+## sessiond instances
+* Instances are started using:
+
+        sessiond -instance="$INSTANCEID" -stderrthreshold=FATAL -log_dir="$LOGDIR" -v=2 &
+
+* $INSTANCEID is used to select the instance specific configuration
+* $LOGDIR is where this instance will log to
+* The user will need to enter the database source string and the server key on the command line for each instance
 
 
 [scrypt]: https://code.google.com/p/go/source/browse/?repo=crypto#hg%2Fscrypt 
