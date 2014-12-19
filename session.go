@@ -6,7 +6,7 @@ import (
   "database/sql"
   "encoding/json"
   "fmt"
-  "github.com/Grant-Murray/mailbot"
+  "code.grantmurray.com/mailbot"
   "github.com/golang/glog"
   "github.com/gorilla/context"
   "github.com/gorilla/mux"

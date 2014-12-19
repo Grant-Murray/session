@@ -4,9 +4,9 @@ SessionMaxLife = 18*60*60, /* 18 hours */
 PasswordResetExpiresDuration = 4*60*60, /* 4 hours */
 SmtpServerHost = 'test.mailbot.net',
 SmtpServerPort = 26,
-SmtpFrom = 'no-reply@mailbot.net',
-SmtpAuthUsername = 'no-reply@mailbot.net',
-SmtpAuthPassword = 'zFbfrrRUNBdxBHaaJCNh8X',
+SmtpFrom = 'fromster@mailbot.net',
+SmtpAuthUsername = 'fromster@mailbot.net',
+SmtpAuthPassword = 'from me from me',
 
 ResetTemplate = 
 'To: {{.FirstName}} {{.LastName}}<{{.EmailAddr}}>
@@ -85,10 +85,10 @@ eyqrEtky5MIoSpwchlIwVuw=
 -----END PRIVATE KEY-----',
 HttpsCert =
 '-----BEGIN CERTIFICATE-----
-MIIDTzCCArigAwIBAgIBAjANBgkqhkiG9w0BAQUFADBsMQswCQYDVQQGEwJVUzET
+MIIDTzCCArigAwIBAgIBBzANBgkqhkiG9w0BAQUFADBsMQswCQYDVQQGEwJVUzET
 MBEGA1UECAwKQ2FsaWZvcm5pYTERMA8GA1UECgwIR0xNIFRlc3QxDzANBgNVBAMM
 BkdMTSBDQTEkMCIGCSqGSIb3DQEJARYVZW1haWxAZ3JhbnRtdXJyYXkuY29tMB4X
-DTEzMDkyODE5MTYwM1oXDTE0MDkyODE5MTYwM1owbjELMAkGA1UEBhMCVVMxEzAR
+DTE0MTAxNjE5NDkwOFoXDTE1MTAxNjE5NDkwOFowbjELMAkGA1UEBhMCVVMxEzAR
 BgNVBAgMCkNhbGlmb3JuaWExETAPBgNVBAoMCEdMTSBUZXN0MREwDwYDVQQDDAhw
 bG9nLm9yZzEkMCIGCSqGSIb3DQEJARYVZW1haWxAZ3JhbnRtdXJyYXkuY29tMIIB
 IjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1eguLZ0C366JZms3HUohglho
@@ -100,8 +100,8 @@ rW+IbTh57u80RwLZooticZ8ljQ9I4JT56TE2xQwr6G7hsIMLj9+ATLVqjyxi7/xX
 AQABo3sweTAJBgNVHRMEAjAAMCwGCWCGSAGG+EIBDQQfFh1PcGVuU1NMIEdlbmVy
 YXRlZCBDZXJ0aWZpY2F0ZTAdBgNVHQ4EFgQUTu/ykZytBklUe+r05a0/IWi1Jrow
 HwYDVR0jBBgwFoAU6K3nBZy2XLJIZMBk0iDJhu7vnTkwDQYJKoZIhvcNAQEFBQAD
-gYEARUhKn0LO2cruizriNGiCKpISs8plY3V1ZEkOAqA6aM9X8dH5ibPanQEeXWCl
-ZzY6IFE0QZD4VPgXe4omTNu5wWmehhQuR+my4uefe1NcpdsxoqPGTZFhyxcoiM4p
-JRLwW7yf6ZZEBOb83X25Y7ih2pL6dZ58x9+ElSLKDrET/RM=
+gYEAJawm0tDxnn7QxranyUyOddyV4yWt0dWEprBMVpJ/f1Lx0JpkJuMNaWPVPIGr
+OFOGe5fGXu5vbqVMMasPJ/vxQ2Hu8SUcTjGawl1nKUPsAtsZ1+hJo2X0KclfJgLu
+3/icOMQzgkx8bBWwbEDREgQM8Jhl1QZkZsCjm69X+8+4T6g=
 -----END CERTIFICATE-----'
 WHERE HttpsHost = 'plog.org';

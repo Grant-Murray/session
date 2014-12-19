@@ -6,7 +6,7 @@ import (
   "encoding/hex"
   "flag"
   "fmt"
-  "github.com/Grant-Murray/mailbot"
+  "code.grantmurray.com/mailbot"
   "github.com/golang/glog"
   _ "github.com/lib/pq"
   "os"
